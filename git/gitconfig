@@ -126,5 +126,5 @@
 [include]
   path = .gitconfig.user
 [user]
-	name = Sergey Khilko
-	email = skhilko@gmail.com
+  name = Sergey Khilko
+  email = (none)
