@@ -128,3 +128,9 @@
 [user]
   name = Sergey Khilko
   email = (none)
+[commit]
+  template = ~/.yadr/git/commit-template
+[filter "lfs"]
+	clean = git lfs clean %f
+	smudge = git lfs smudge %f
+	required = true
