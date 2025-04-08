@@ -1,11 +1,11 @@
 // -*- mode: jsonc -*-
 {
-    // "layer": "top", // Waybar at top layer
-    // "position": "bottom", // Waybar position (top|bottom|left|right)
-    "height": 30, // Waybar height (to be removed for auto height)
-    // "width": 1280, // Waybar width
-    "spacing": 4, // Gaps between modules (4px)
-    // Choose the order of the modules
+    "margin-top": 12,
+    "margin-bottom": 0,
+    "margin-left": 24,
+    "margin-right": 24,    
+    "spacing": 12,
+
     "modules-left": [
         "hyprland/workspaces"
     //    "sway/mode",
@@ -16,8 +16,7 @@
         "hyprland/window"
     ],
     "modules-right": [
-	"custom/shade",
-        "mpd",
+	    "custom/shade",
         "idle_inhibitor",
         "pulseaudio",
         "network",
@@ -34,17 +33,7 @@
         "disable-scroll": true,
         "all-outputs": true,
         "warp-on-scroll": false,
-        "format": "{name}: {icon}",
-        "format-icons": {
-        //    "1": "",
-        //    "2": "",
-        //    "3": "",
-        //    "4": "",
-        //    "5": "",
-            "urgent": "",
-            "active": "",
-            "default": ""
-        }
+        "format": "{}"
     },
     "sway/mode": {
         "format": "<span style=\"italic\">{}</span>"
@@ -84,7 +73,8 @@
     },
     "custom/shade": {
 	    "on-click": "hyprctl hyprsunset temperature 2500",
-	    "format": ""
+	    "format": "",
+        "tooltip-format": "Toggle blue light filter"
     },
     "idle_inhibitor": {
         "format": "{icon}",

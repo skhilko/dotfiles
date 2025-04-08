@@ -1,26 +1,63 @@
-@import "catppuccin_mocha.css";
+@import "colors.css";
+
+
+/**
+
+- **base00** - Default Background
+- **base01** - Lighter Background (Used for status bars, line number and folding marks)
+- **base02** - Selection Background
+- **base03** - Comments, Invisibles, Line Highlighting
+- **base04** - Dark Foreground (Used for status bars)
+- **base05** - Default Foreground, Caret, Delimiters, Operators
+- **base06** - Light Foreground (Not often used)
+- **base07** - Light Background (Not often used)
+- **base08** - Variables, XML Tags, Markup Link Text, Markup Lists, Diff Deleted
+- **base09** - Integers, Boolean, Constants, XML Attributes, Markup Link Url
+- **base0A** - Classes, Markup Bold, Search Text Background
+- **base0B** - Strings, Inherited Class, Markup Code, Diff Inserted
+- **base0C** - Support, Regular Expressions, Escape Characters, Markup Quotes
+- **base0D** - Functions, Methods, Attribute IDs, Headings
+- **base0E** - Keywords, Storage, Selector, Markup Italic, Diff Changed
+- **base0F** - Deprecated, Opening/Closing Embedded Language Tags, e.g. `<?php ?>`
+*/
+
+@define-color color-background @base01;
+@define-color color-text @base05;
+@define-color color-text-active @base03;
+
+@define-color color-button @base00;
+@define-color color-button-active @base0B;
+@define-color color-button-hover @base0C;
+@define-color color-button-urgent @base08;
+
+
+@define-color color-accent @base0B;
+@define-color color-warning @base09;
+@define-color color-error @base08;
+@define-color color-background-light @base00;
+@define-color color-background-dark @base01;
+@define-color color-workspaces-background1 @base00;
+@define-color color-workspaces-background2 @base01;
+@define-color color-border @base00;
+@define-color color-text1 @base05;
+@define-color color-text2 @base05;
+@define-color color-text3 @base05;
+@define-color color-icon @base05;
+@define-color color-icon-background @base00;
+@define-color color-icon-background-active @base0A;
+@define-color color-icon-background-hover @base0B;
+@define-color color-icon-background-urgent @base08;
+@define-color color-icon-background-muted @base03;
+@define-color color-icon-background-muted-active @base0A; 
+
 
 * {
-  /* reference the color by using @color-name */
-  color: @text;
+    font-family: "Fira Sans", FontAwesome, Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
 }
 
 window#waybar {
-  /* you can also GTK3 CSS functions! */
-  background-color: shade(@base, 0.9);
-  border: 2px solid alpha(@crust, 0.3);
-}
-
-* {
-    /* `otf-font-awesome` is required to be installed for icons */
-    font-family: FontAwesome, Roboto, Helvetica, Arial, sans-serif;
-    font-size: 13px;
-}
-
-window#waybar {
-    /* background-color: rgba(43, 48, 59, 0.5);
-    border-bottom: 3px solid rgba(100, 114, 125, 0.5);
-    color: #ffffff;*/
+    background-color: transparent;
     transition-property: background-color;
     transition-duration: .5s;
 }
@@ -29,60 +66,58 @@ window#waybar.hidden {
     opacity: 0.2;
 }
 
-/*
-window#waybar.empty {
-    background-color: transparent;
-}
-window#waybar.solo {
-    background-color: #FFFFFF;
-}
-*/
 
-window#waybar.termite {
-    background-color: #3F3F3F;
-}
+/* -----------------------------------------------------
+ * Workspaces
+ * ----------------------------------------------------- */
 
-window#waybar.chromium {
-    background-color: #000000;
-    border: none;
-}
-
-button {
-    /* Use box-shadow instead of border so the text isn't offset */
-    box-shadow: inset 0 -3px transparent;
-    /* Avoid rounded borders under each button name */
-    border: none;
-    border-radius: 0;
-}
-
-/* https://github.com/Alexays/Waybar/wiki/FAQ#the-workspace-buttons-have-a-strange-hover-effect */
-button:hover {
-    background: inherit;
-    box-shadow: inset 0 -3px #ffffff;
-}
-
-/* you can set a style on hover for any module like this */
-#pulseaudio:hover {
-    background-color: #a37800;
+ #workspaces {
+    background: @color-background;
+    margin: 2px 18px 3px 1px;
+    padding: 3px 6px;
+    border-radius: 6px;
 }
 
 #workspaces button {
-    padding: 0 5px;
-    background-color: transparent;
-    color: #ffffff;
+    padding: 0px 6px;
+    min-width: 16px;
+    margin-left: 3px;
+    border-radius: 6px;
+    background-color: @color-button;
+    transition: all 0.1s linear;
+}
+
+#workspaces button.active {
+    color: @color-text-active;
+    background: @color-button-active;
+    min-width: 48px;
+    transition: all 0.1s linear;
 }
 
 #workspaces button:hover {
-    background: rgba(0, 0, 0, 0.2);
-}
-
-#workspaces button.focused {
-    background-color: #64727D;
-    box-shadow: inset 0 -3px #ffffff;
+    background: @color-button-hover;
 }
 
 #workspaces button.urgent {
-    background-color: #eb4d4b;
+    background-color: @color-button-urgent;
+}
+
+
+/* -----------------------------------------------------
+ * Modules
+ * ----------------------------------------------------- */
+
+ .module {
+    min-width: 16px;
+    margin-left: 6px;
+ }
+
+.modules-right {
+    background-color: @color-background;
+    color: @color-text;
+    padding: 6px 12px;
+    border-radius: 6px;
+    opacity: 0.8;
 }
 
 #mode {
@@ -108,12 +143,6 @@ button:hover {
 #power-profiles-daemon,
 #mpd {
     padding: 0 10px;
-    color: #ffffff;
-}
-
-#window,
-#workspaces {
-    margin: 0 4px;
 }
 
 /* If workspaces is the leftmost module, omit left margin */
@@ -127,7 +156,7 @@ button:hover {
 }
 
 #clock {
-    background-color: #64727D;
+    min-width: 38px;
 }
 
 #battery {
@@ -136,7 +165,6 @@ button:hover {
 }
 
 #battery.charging, #battery.plugged {
-    color: #ffffff;
     background-color: #26A65B;
 }
 
@@ -150,7 +178,6 @@ button:hover {
 /* Using steps() instead of linear as a timing function to limit cpu usage */
 #battery.critical:not(.charging) {
     background-color: #f53c3c;
-    color: #ffffff;
     animation-name: blink;
     animation-duration: 0.5s;
     animation-timing-function: steps(12);
@@ -158,97 +185,16 @@ button:hover {
     animation-direction: alternate;
 }
 
-#power-profiles-daemon {
-    padding-right: 15px;
-}
-
-#power-profiles-daemon.performance {
-    background-color: #f53c3c;
-    color: #ffffff;
-}
-
-#power-profiles-daemon.balanced {
-    background-color: #2980b9;
-    color: #ffffff;
-}
-
-#power-profiles-daemon.power-saver {
-    background-color: #2ecc71;
-    color: #000000;
-}
-
-label:focus {
-    background-color: #000000;
-}
-
-#cpu {
-    background-color: #2ecc71;
-    color: #000000;
-}
-
-#memory {
-    background-color: #9b59b6;
-}
-
-#disk {
-    background-color: #964B00;
-}
-
-#backlight {
-    background-color: #90b1b1;
-}
-
-#network {
-    background-color: #2980b9;
-}
-
 #network.disconnected {
-    background-color: #f53c3c;
-}
-
-#pulseaudio {
-    background-color: #f1c40f;
-    color: #000000;
-}
-
-#pulseaudio.muted {
-    background-color: #90b1b1;
-    color: #2a5c45;
-}
-
-#wireplumber {
-    background-color: #fff0f5;
-    color: #000000;
-}
-
-#wireplumber.muted {
-    background-color: #f53c3c;
-}
-
-#custom-media {
-    background-color: #66cc99;
-    color: #2a5c45;
-    min-width: 100px;
-}
-
-#custom-media.custom-spotify {
-    background-color: #66cc99;
-}
-
-#custom-media.custom-vlc {
-    background-color: #ffa000;
+    background-color: @color-button-urgent;
 }
 
 #temperature {
-    background-color: #f0932b;
+    min-width: 48px;
 }
 
 #temperature.critical {
-    background-color: #eb4d4b;
-}
-
-#tray {
-    background-color: #2980b9;
+    background-color: @color-button-urgent;
 }
 
 #tray > .passive {
@@ -257,7 +203,7 @@ label:focus {
 
 #tray > .needs-attention {
     -gtk-icon-effect: highlight;
-    background-color: #eb4d4b;
+    background-color: @color-button-urgent;
 }
 
 #idle_inhibitor {
@@ -265,41 +211,16 @@ label:focus {
 }
 
 #idle_inhibitor.activated {
-    background-color: #ecf0f1;
-    color: #2d3436;
-}
-
-#mpd {
-    background-color: #66cc99;
-    color: #2a5c45;
-}
-
-#mpd.disconnected {
-    background-color: #f53c3c;
-}
-
-#mpd.stopped {
-    background-color: #90b1b1;
-}
-
-#mpd.paused {
-    background-color: #51a37a;
+    color: @color-text-active;
+    background: @color-button-active;
 }
 
 #language {
-    background: #00b093;
-    color: #740864;
     padding: 0 5px;
-    margin: 0 5px;
-    min-width: 16px;
 }
 
 #keyboard-state {
-    background: #97e1ad;
-    color: #000000;
     padding: 0 0px;
-    margin: 0 5px;
-    min-width: 16px;
 }
 
 #keyboard-state > label {
@@ -328,7 +249,7 @@ label:focus {
 }
 
 #privacy-item.screenshare {
-    background-color: #cf5700;
+    background-color: @color-button-urgent;
 }
 
 #privacy-item.audio-in {
