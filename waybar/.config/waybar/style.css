@@ -9,7 +9,7 @@
 #waybar {
     background-color: transparent;
     transition-property: background-color;
-    background-color: @base;
+    background-color: @crust;
     color: @text;
     opacity: 0.8;
 }
@@ -40,7 +40,7 @@
 #workspaces button.active,
 #idle_inhibitor.activated {
     background: @flamingo;
-    color: @crust;
+    color: @base;
 }
 
 #workspaces button.active {
@@ -167,6 +167,10 @@
     background-color: #0069d4;
 }
 
+#custom-notification {
+    font-family: "FiraCode Nerd Font";
+}
+
 #custom-shade:hover,
 #custom-power:hover,
 #clock:hover,
@@ -174,6 +178,7 @@
 #wireplumber:hover,
 #network:hover,
 #power-profiles-daemon:hover,
-#idle_inhibitor:hover {
+#idle_inhibitor:hover,
+#custom-notification:hover {
     background-color: @surface0;
 }
