@@ -1,10 +1,11 @@
 // -*- mode: jsonc -*-
 {
-    "margin-top": 12,
+    "margin-top": 0,
     "margin-bottom": 0,
-    "margin-left": 24,
-    "margin-right": 24,    
+    "margin-left": 0,
+    "margin-right": 0,    
     "spacing": 12,
+    "reload_style_on_change": true,
 
     "modules-left": [
         "hyprland/workspaces"
@@ -25,8 +26,8 @@
         "memory",
         "temperature",
         "hyprland/language",
-        "clock",
         "tray",
+        "clock",
         "custom/power"
     ],
     "hyprland/workspaces": {

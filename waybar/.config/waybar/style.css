@@ -2,18 +2,19 @@
 
 
 * {
-    font-family: "Fira Sans", FontAwesome, Roboto, Helvetica, Arial, sans-serif;
-    font-size: 16px;
+    font-family: "Fira Sans", FontAwesome, Roboto, sans-serif;
+    font-size: 14px;
 }
 
-window#waybar {
+#waybar {
     background-color: transparent;
     transition-property: background-color;
-    transition-duration: .5s;
+    background-color: @base;
     color: @text;
+    opacity: 0.8;
 }
 
-window#waybar.hidden {
+#waybar.hidden {
     opacity: 0.2;
 }
 
@@ -22,19 +23,17 @@ window#waybar.hidden {
  * Workspaces
  * ----------------------------------------------------- */
 
- #workspaces {
-    background: @base;
-    margin: 2px 18px 3px 1px;
-    padding: 3px 6px;
-    border-radius: 6px;
+#workspaces {
+    padding: 0;
 }
+
 
 #workspaces button {
     padding: 0px 6px;
     min-width: 16px;
     margin-left: 3px;
     border-radius: 6px;
-    transition: all 0.1s linear;
+    transition: all 0.15s ease;
 }
 
 #workspaces button:hover,
@@ -57,51 +56,30 @@ window#waybar.hidden {
  * Modules
  * ----------------------------------------------------- */
 
- .module {
-    min-width: 16px;
-    margin-left: 6px;
- }
+.modules-left {
+    margin-left: 12px
+}
 
 .modules-right {
-    background-color: @base;
-    padding: 6px 12px;
+    margin-right: 12px;
+}
+
+.modules-left,
+.modules-right,
+.modules-center {
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+.module {
+    padding: 0px 6px;
     border-radius: 6px;
-    /* opacity: 0.8; */
+    transition: all 0.1s ease;
 }
 
 #mode {
     background-color: #64727D;
     box-shadow: inset 0 -3px #ffffff;
-}
-
-#clock,
-#battery,
-#cpu,
-#memory,
-#disk,
-#temperature,
-#backlight,
-#network,
-#pulseaudio,
-#wireplumber,
-#custom-media,
-#tray,
-#mode,
-#idle_inhibitor,
-#scratchpad,
-#power-profiles-daemon,
-#mpd {
-    padding: 0 10px;
-}
-
-/* If workspaces is the leftmost module, omit left margin */
-.modules-left > widget:first-child > #workspaces {
-    margin-left: 0;
-}
-
-/* If workspaces is the rightmost module, omit right margin */
-.modules-right > widget:last-child > #workspaces {
-    margin-right: 0;
 }
 
 #clock {
@@ -138,20 +116,14 @@ window#waybar.hidden {
     background-color: @red;
 }
 
-#temperature {
-    min-width: 48px;
-}
-
 #temperature.critical {
     background-color: @red;
 }
 
 #tray {
     background-color: @surface0;
-    padding: 3px 6px;
     border-radius: 6px;
 }
-
 
 #tray > .passive {
     -gtk-icon-effect: dim;
@@ -160,22 +132,6 @@ window#waybar.hidden {
 #tray > .needs-attention {
     -gtk-icon-effect: highlight;
     background-color: @red;
-}
-
-#idle_inhibitor {
-    background-color: @surface0;
-}
-
-#language {
-    padding: 0 5px;
-}
-
-#keyboard-state {
-    padding: 0 0px;
-}
-
-#keyboard-state > label {
-    padding: 0 5px;
 }
 
 #keyboard-state > label.locked {
@@ -209,4 +165,15 @@ window#waybar.hidden {
 
 #privacy-item.audio-out {
     background-color: #0069d4;
+}
+
+#custom-shade:hover,
+#custom-power:hover,
+#clock:hover,
+#pulseaudio:hover,
+#wireplumber:hover,
+#network:hover,
+#power-profiles-daemon:hover,
+#idle_inhibitor:hover {
+    background-color: @surface0;
 }
