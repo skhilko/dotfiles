@@ -20,6 +20,7 @@
 	    "custom/shade",
         "idle_inhibitor",
         "pulseaudio",
+        // "bluetooth",
         "network",
         "power-profiles-daemon",
         "cpu",
@@ -127,6 +128,14 @@
         "format-linked": "{ifname} (No IP) ",
         "format-disconnected": "Disconnected ⚠",
         "format-alt": "{ifname}: {ipaddr}/{cidr}"
+    },
+    "bluetooth": {
+        "format": " {status}",
+        "format-disabled": "",
+        "format-off": "",
+        "interval": 30,
+        "on-click": "blueman-manager",
+        "format-no-controller": ""
     },
     "pulseaudio": {
         // "scroll-step": 1, // %, can be a float

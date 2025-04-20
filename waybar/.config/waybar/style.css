@@ -116,6 +116,12 @@
     background-color: @red;
 }
 
+#bluetooth.off {
+    background-color: transparent;
+    padding: 0px;
+    margin: 0px;
+}
+
 #temperature.critical {
     background-color: @red;
 }
@@ -176,6 +182,7 @@
 #clock:hover,
 #pulseaudio:hover,
 #wireplumber:hover,
+#bluetooth:hover,
 #network:hover,
 #power-profiles-daemon:hover,
 #idle_inhibitor:hover,
