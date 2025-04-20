@@ -5,6 +5,7 @@
 
 window {
   background-color: rgba(30, 30, 46, 0.90);
+  background: url("../wallpapers/watch_tower.png") no-repeat center center/cover;
   font-family: "Fira Sans", FontAwesome, Roboto, sans-serif;
   font-size: 14px;
 }
