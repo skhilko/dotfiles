@@ -11,7 +11,7 @@
     transition-property: background-color;
     background-color: @crust;
     color: @text;
-    opacity: 0.8;
+    /* opacity: 0.8; */
 }
 
 #waybar.hidden {
