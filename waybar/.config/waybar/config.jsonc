@@ -20,7 +20,7 @@
 	    "custom/shade",
         "idle_inhibitor",
         "pulseaudio",
-        // "bluetooth",
+        "bluetooth",
         "network",
         "power-profiles-daemon",
         "cpu",
