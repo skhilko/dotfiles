@@ -17,6 +17,7 @@
         "hyprland/window"
     ],
     "modules-right": [
+        "custom/voxtype",
 	    "custom/shade",
         "idle_inhibitor",
         "pulseaudio",
@@ -192,5 +193,17 @@
         "on-click": "swaync-client -t -sw",
         "on-click-right": "swaync-client -d -sw",
         "escape": true
-    }
+    },
+   "custom/voxtype": {
+       "exec": "voxtype status --follow --format json",
+       "return-type": "json",
+       "format": "{icon}",
+       "format-icons": {
+           "idle": "\uf130",
+           "recording": "\uf111",
+           "transcribing": "\uf110",
+           "stopped": "\uf131"
+       },
+       "tooltip": true
+   }
 }
