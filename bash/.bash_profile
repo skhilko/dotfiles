@@ -6,4 +6,7 @@
 #   exec uwsm start hyprland.desktop
 # fi
 
-[[ -f ~/.bashrc ]] && . ~/.bashrc
+# sensitive env variables
+[[ -r "$HOME/.bash_profile.local" ]] && . "$HOME/.bash_profile.local"
+
+[[ -f "$HOME/.bashrc" ]] && . "$HOME/.bashrc"
