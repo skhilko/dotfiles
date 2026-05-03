@@ -36,15 +36,17 @@ pi/
   .pi/agent/settings.json
   .pi/agent/APPEND_SYSTEM.md
   .pi/agent/skills/
+  .pi/agent/themes/
   src/AGENTS.md
 ```
 
 After stowing:
 
 ```text
-~/.pi/agent/settings.json      -> ~/dotfiles/pi/.pi/agent/settings.json
-~/.pi/agent/APPEND_SYSTEM.md   -> ~/dotfiles/pi/.pi/agent/APPEND_SYSTEM.md
-~/src/AGENTS.md                -> ~/dotfiles/pi/src/AGENTS.md
+~/.pi/agent/settings.json                    -> ~/dotfiles/pi/.pi/agent/settings.json
+~/.pi/agent/APPEND_SYSTEM.md                 -> ~/dotfiles/pi/.pi/agent/APPEND_SYSTEM.md
+~/.pi/agent/themes/catppuccin-mocha.json     -> ~/dotfiles/pi/.pi/agent/themes/catppuccin-mocha.json
+~/src/AGENTS.md                              -> ~/dotfiles/pi/src/AGENTS.md
 ```
 
 The intent is to sync reusable Pi configuration and instructions across devices while keeping secrets and local state out of Git.
@@ -54,6 +56,7 @@ Synced:
 - `~/.pi/agent/settings.json` — global Pi settings
 - `~/.pi/agent/APPEND_SYSTEM.md` — extra global system instructions
 - `~/.pi/agent/skills/` — custom/shared skills source files
+- `~/.pi/agent/themes/` — shared custom Pi themes
 - `~/src/AGENTS.md` — shared instructions for projects under `~/src`
 
 Not synced intentionally:
