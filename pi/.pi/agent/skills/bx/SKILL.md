@@ -1,6 +1,10 @@
 ---
 name: bx
-description: USE FOR web search, web research, RAG, grounding, browse, find, lookups, fact-checking, documentation, agentic AI. Optimized for AI agents: pre-extracted, token-budgeted web content, news, images, videos, places, custom ranking
+description: >-
+  Web search and web research with bx/Brave Search CLI. Use when needing current
+  web search, grounding, RAG, fact-checking, documentation lookup, or reading web
+  pages. Returns pre-extracted, token-budgeted readable content; prefer bx
+  "query" and URL-as-query for reading specific results.
 ---
 
 # bx — Brave Search CLI
