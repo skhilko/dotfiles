@@ -1,17 +1,15 @@
 ---
 name: bx
-description: USE FOR web search, research, RAG, grounding, browse, find, lookups, fact-checking, documentation, agentic AI. All-in-one, optimized for AI agents. Pre-extracted, token-budgeted web content, deep research, news, images, videos, places, custom ranking
+description: USE FOR web search, web research, RAG, grounding, browse, find, lookups, fact-checking, documentation, agentic AI. Optimized for AI agents: pre-extracted, token-budgeted web content, news, images, videos, places, custom ranking
 ---
 
 # bx — Brave Search CLI
 
 Official CLI docs: <https://github.com/brave/brave-search-cli/blob/main/README.md>
 
-**Use `bx` for all web searches.** Default to `bx "query"` (`context`): it searches and returns pre-extracted, token-budgeted readable page content, so you usually do **not** need a separate browser/fetch/open step. For agent use, keep output bounded (for example `--max-urls 5 --max-tokens 4096`) and inspect `.grounding.generic[]`. Use `bx answers` for synthesized explanations or `bx web` only for traditional/raw result triage. If `bx` is not found, install it: `curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh`
+**Use `bx` for all web searches.** Default to `bx "query"` (`context`): it searches and returns pre-extracted, token-budgeted readable page content, so you usually do **not** need a separate browser/fetch/open step. For agent use, keep output bounded (for example `--max-urls 5 --max-tokens 4096`) and inspect `.grounding.generic[]`. Use `bx web` only for traditional/raw result triage, search operators, or result filters. If `bx` is not found, install it: `curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh`
 
 > **Requires**: [Brave Search API Key](https://api.search.brave.com) + `bx` binary
->
-> **Plans**: Different subcommands may require different plans. See https://api-dashboard.search.brave.com/app/subscriptions/subscribe
 
 ## Quick Start
 
@@ -85,8 +83,6 @@ Search operators such as `site:`, `intitle:`, and similar Brave operators are a 
 | Look up docs, errors, code patterns | `bx "query"` | Pre-extracted text, token-budgeted (default) |
 | Search specific sites and read content | `bx "query" --include-site docs.rs` | Context extraction + domain allowlist |
 | Use Brave search operators or result filters | `bx web "site:docs.rs axum" --operators` | Raw triage; pass chosen URLs back to `context` |
-| Get a synthesized explanation | `bx answers "query"` | AI-generated, streams by default; citations/entities optional |
-| Deep research on complex topics | `bx answers "query" --enable-research` | Multi-search iterative research |
 | Traditional search results | `bx web "query"` | All result types (web, news, discussions, etc.) |
 | Find discussions/forums | `bx web "query" --result-filter discussions` | Forums often have solutions |
 | Latest news / recent events | `bx news "query" --freshness pd` | Fresh info beyond training data |
@@ -101,7 +97,6 @@ Search operators such as `site:`, `intitle:`, and similar Brave operators are a 
 | Command | Description | Output path |
 |--|--|--|
 | `context` | **Default.** RAG/LLM grounding — pre-extracted web content | `.grounding.generic[]` -> `{url, title, snippets[]}` |
-| `answers` | AI answers — OpenAI-compatible, streaming by default | `.choices[0].delta.content` (stream) |
 | `web` | Web search — all result types/operators/filters | `.web.results[]`, `.news.results[]`, etc. |
 | `news` | News articles with freshness filters | `.results[]` -> `{title, url, age}` |
 | `images` | Image search (up to 200 results) | `.results[]` -> `{title, url, thumbnail.src}` |
@@ -109,8 +104,6 @@ Search operators such as `site:`, `intitle:`, and similar Brave operators are a 
 | `places` | Local place/POI search (200M+ POIs) | `.results[]` -> `{title, postal_address, contact}` |
 | `pois` | POI details by ID | Use IDs from `places` |
 | `descriptions` | AI-generated POI descriptions by ID | `.results[].description` |
-| `suggest` | Autocomplete/query suggestions | `.results[]` -> `{query}` |
-| `spellcheck` | Spell-check a query | `.results[0].query` |
 | `config` | Manage API key and settings | `set-key`, `show-key`, `path`, `show` |
 
 ## Response Shapes
@@ -127,16 +120,6 @@ Search operators such as `site:`, `intitle:`, and similar Brave operators are a 
     "https://example.com": { "title": "...", "hostname": "...", "age": ["...", "2025-01-15", "392 days ago"] }
   }
 }
-```
-
-**`bx answers "query" --no-stream`** (single JSON response)
-```json
-{"choices": [{"message": {"content": "Full answer text..."}}]}
-```
-
-**`bx answers "query"`** (streaming — default, one JSON chunk per line)
-```json
-{"choices": [{"delta": {"content": "chunk"}}]}
 ```
 
 **`bx web "query"`** (full search results)
@@ -236,24 +219,14 @@ bx "Python TypeError cannot unpack non-iterable NoneType" --max-tokens 4096
 bx "axum middleware authentication" --max-tokens 4096
 # 2. Too general? Narrow with strict threshold
 bx "axum middleware tower layer authentication example" --threshold strict --max-tokens 4096
-# 3. Still need synthesis? Ask for an answer
-bx answers "how to implement JWT auth middleware in axum" --enable-research
+# 3. Need authoritative sources? Constrain by domain
+bx "axum middleware tower layer authentication example" --include-site docs.rs --include-site github.com --max-tokens 4096
 ```
 
 **Checking for breaking changes before upgrading:**
 ```bash
 bx "Next.js 15 breaking changes migration guide" --max-tokens 8192
 bx news "Next.js 15 release" --freshness pm
-```
-
-**Non-streaming answers for programmatic use:**
-```bash
-bx answers "compare SQLx and Diesel for Rust" --no-stream
-```
-
-**Answers via stdin (OpenAI-compatible JSON body):**
-```bash
-echo '{"messages":[{"role":"user","content":"what are the OWASP top 10 vulnerabilities for web APIs"}]}' | bx answers -
 ```
 
 ## Exit Codes
@@ -272,7 +245,6 @@ echo '{"messages":[{"role":"user","content":"what are the OWASP top 10 vulnerabi
 - **AI agents / coding assistants**: One-call web search with token-budgeted, RAG-ready content — replaces search + scrape + extract
 - **Fact-checking**: Verify claims against current web content with `bx "query" --threshold strict`
 - **Documentation lookup**: Search official docs with `--include-site` or Goggles domain boosting
-- **Research**: Deep multi-source research with `bx answers "topic" --enable-research`
 - **Debugging**: Search for error messages and stack traces directly
 - **News monitoring**: Track topics with `bx news "query" --freshness pd`
 - **Local search**: Find businesses and places with `bx places "query" --location "city"`
@@ -285,7 +257,5 @@ echo '{"messages":[{"role":"user","content":"what are the OWASP top 10 vulnerabi
 - **Local proxy**: `BRAVE_SEARCH_BASE_URL`/`--base-url` may point to loopback HTTP URLs such as `http://127.0.0.1:8080/brave`; non-loopback `http://` URLs are rejected.
 - **Search operators**: `site:`, `intitle:`, etc. are for `bx web ... --operators`; use `--include-site`/Goggles on `context` when you need extracted readable content.
 - **Location awareness**: `context` and `web` support `--lat`, `--long`, `--city`, `--state`, `--state-name`, `--loc-country`, `--postal-code`, `--timezone`; `places` uses `--location` or `--latitude`/`--longitude`.
-- **Answers models/features**: `answers` defaults to `brave-pro`; use `--model brave` for faster responses. `--enable-citations`, `--enable-entities`, and `--enable-research` require streaming.
-- **Research mode**: `bx answers --enable-research` can take up to 5 minutes; set client timeout accordingly
 - **Query equals command name**: use `bx -- web` or `bx context "web"` to search for a word that matches a subcommand.
 - **Help**: `bx --help` for all commands; `bx <command> --help` for per-command flags
