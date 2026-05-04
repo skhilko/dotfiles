@@ -4,7 +4,7 @@ Personal configuration managed with GNU Stow. Each top-level directory is a Stow
 
 ## Usage
 
-From this repository:
+From this repository, most packages should be stowed with `--no-folding`:
 
 ```bash
 cd ~/dotfiles
@@ -16,10 +16,9 @@ Examples:
 ```bash
 stow --no-folding -t "$HOME" bash
 stow --no-folding -t "$HOME" kitty
-stow --no-folding -t "$HOME" pi
 ```
 
-Use `--no-folding` so Stow links individual files instead of replacing whole directories like `~/.config` or `~/.pi`. This keeps machine-local/private files in place.
+Use `--no-folding` so Stow links individual files instead of replacing whole directories like `~/.config` or `~/.pi`. This keeps machine-local/private files in place. The `pi` package has an intentional exception for directory-backed resources such as skills; see below.
 
 To unstow a package:
 
@@ -45,11 +44,12 @@ After stowing:
 ```text
 ~/.pi/agent/settings.json                    -> ~/dotfiles/pi/.pi/agent/settings.json
 ~/.pi/agent/APPEND_SYSTEM.md                 -> ~/dotfiles/pi/.pi/agent/APPEND_SYSTEM.md
+~/.pi/agent/skills                           -> ~/dotfiles/pi/.pi/agent/skills
 ~/.pi/agent/themes/catppuccin-mocha.json     -> ~/dotfiles/pi/.pi/agent/themes/catppuccin-mocha.json
 ~/src/AGENTS.md                              -> ~/dotfiles/pi/src/AGENTS.md
 ```
 
-The intent is to sync reusable Pi configuration and instructions across devices while keeping secrets and local state out of Git.
+The intent is to sync reusable Pi configuration and instructions across devices while keeping secrets and local state out of Git. Pi skills are kept as a folded directory symlink so skills created under the normal `~/.pi/agent/skills/` path show up as untracked files in this repo and can be committed.
 
 Synced:
 
@@ -71,8 +71,10 @@ On a new device:
 ```bash
 mkdir -p ~/.pi/agent ~/src
 cd ~/dotfiles
-stow --no-folding -t "$HOME" pi
+stow -t "$HOME" pi
 ```
+
+For `pi`, omit `--no-folding` after creating the parent directories above. This lets Stow fold directory-backed resources such as `~/.pi/agent/skills` to the repo without replacing `~/.pi`, `~/.pi/agent`, or `~/src`.
 
 Then run Pi and log in on that device if needed:
 
