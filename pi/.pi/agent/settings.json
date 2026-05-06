@@ -1,9 +1,14 @@
 {
-  "lastChangelogVersion": "0.72.1",
+  "lastChangelogVersion": "0.73.0",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.5",
-  "defaultThinkingLevel": "xhigh",
+  "defaultThinkingLevel": "high",
   "theme": "catppuccin-mocha",
   "hideThinkingBlock": true,
-  "packages": []
+  "packages": [],
+  "enabledModels": [
+    "openai-codex/gpt-5.5",
+    "ollama/gemma4:26b",
+    "ollama/gemma4:31b"
+  ]
 }

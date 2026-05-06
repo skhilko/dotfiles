@@ -1,10 +1,10 @@
 // -*- mode: jsonc -*-
 {
-    "margin-top": 0,
+    "margin-top": 4,
     "margin-bottom": 0,
     "margin-left": 0,
     "margin-right": 0,    
-    "spacing": 12,
+    "spacing": 10,
     "reload_style_on_change": true,
 
     "modules-left": [
@@ -38,6 +38,14 @@
         "all-outputs": true,
         "warp-on-scroll": false,
         "format": "{}"
+    },
+    "hyprland/window": {
+        "max-length": 90
+    },
+    "hyprland/language": {
+        "format": " {short}",
+        "format-us": " EN",
+        "format-ru": " RU"
     },
     "sway/mode": {
         "format": "<span style=\"italic\">{}</span>"
@@ -76,9 +84,10 @@
         "tooltip-format-disconnected": "MPD (disconnected)"
     },
     "custom/shade": {
-	    "on-click": "hyprctl hyprsunset temperature 2500",
-	    "format": "",
-        "tooltip-format": "Toggle blue light filter"
+        "on-click": "hyprctl hyprsunset temperature 2500",
+        "on-click-right": "hyprctl hyprsunset identity",
+        "format": "",
+        "tooltip-format": "Night light: left = warm, right = reset"
     },
     "idle_inhibitor": {
         "format": "{icon}",
@@ -93,22 +102,30 @@
     },
     "clock": {
         // "timezone": "America/New_York",
-        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
-        "format-alt": "{:%Y-%m-%d}"
+        "format": " {:%H:%M  %a %d %b}",
+        "format-alt": " {:%Y-%m-%d  %H:%M:%S}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     },
     "cpu": {
-        "format": "{usage}% ",
-        "tooltip": false
+        "format": " {usage}%",
+        "tooltip": false,
+        "states": {
+            "warning": 70,
+            "critical": 90
+        }
     },
     "memory": {
-        "format": "{}% "
+        "format": " {}%",
+        "states": {
+            "warning": 70,
+            "critical": 90
+        }
     },
     "temperature": {
         "hwmon-path": "/sys/class/hwmon/hwmon3/temp1_input",
         "critical-threshold": 95, // The critical temperature for the Ryzen 9 9950X is 95°C
-        "format-critical": "{temperatureC}°C {icon}",
-        "format": "{temperatureC}°C {icon}",
-        "format-icons": ["", "", ""]
+        "format-critical": " {temperatureC}°C",
+        "format": " {temperatureC}°C"
     },
     "power-profiles-daemon": {
       "format": "{icon}",
@@ -123,28 +140,33 @@
     },
     "network": {
         // "interface": "wlp2*", // (Optional) To force the use of this interface
-        "format-wifi": "{essid} ({signalStrength}%) ",
-        "format-ethernet": "{ipaddr}/{cidr} ",
-        "tooltip-format": "{ifname} via {gwaddr} ",
-        "format-linked": "{ifname} (No IP) ",
-        "format-disconnected": "Disconnected ⚠",
+        "format-wifi": " {essid} {signalStrength}%",
+        "format-ethernet": "󰈀 {ipaddr}",
+        "tooltip-format": "{ifname} via {gwaddr}\n{ipaddr}/{cidr}",
+        "format-linked": "󰈀 {ifname}",
+        "format-disconnected": "󰖪 offline",
         "format-alt": "{ifname}: {ipaddr}/{cidr}"
     },
     "bluetooth": {
-        "format": " {status}",
+        "format": "",
+        "format-on": "",
+        "format-connected": " {num_connections}",
         "format-disabled": "",
         "format-off": "",
+        "tooltip-format": "Bluetooth: {status}",
+        "tooltip-format-connected": "{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}",
         "interval": 30,
         "on-click": "blueman-manager",
         "format-no-controller": ""
     },
     "pulseaudio": {
         // "scroll-step": 1, // %, can be a float
-        "format": "{volume}% {icon} {format_source}",
-        "format-bluetooth": "{volume}% {icon} {format_source}",
-        "format-bluetooth-muted": " {icon} {format_source}",
-        "format-muted": " {format_source}",
-        "format-source": "{volume}% ",
+        "format": "{icon} {volume}%  {format_source}",
+        "format-bluetooth": "{icon} {volume}%  {format_source}",
+        "format-bluetooth-muted": "  {format_source}",
+        "format-muted": "  {format_source}",
+        "format-source": " {volume}%",
         "format-source-muted": "",
         "format-icons": {
             "headphone": "",
@@ -170,8 +192,8 @@
         // "exec": "$HOME/.config/waybar/mediaplayer.py --player spotify 2> /dev/null" // Filter player based on name
     },
     "custom/power": {
-        "format" : "⏻ ",
-		"tooltip": false,
+        "format": "⏻",
+        "tooltip": false,
         "on-click": "wlogout"
     },
     "custom/notification": {
