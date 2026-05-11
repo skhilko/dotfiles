@@ -5,11 +5,11 @@
  *
  * Features:
  *  - Auto-switches the llama.cpp server when you change Pi's model (model_select hook)
- *  - /llama-switch command → interactive overlay with status, model list, provisioning
+ *  - /llama-switch command → interactive overlay with status, model list, config sync
  *  - Ctrl+Shift+L → quick-open the model selector overlay
  *  - llama_switch tool → agent-callable model switching
  *  - Footer status indicator showing current server model + readiness
- *  - Provision new models from admin API into Pi's models.json
+ *  - Sync/upsert full model metadata from admin API into Pi's models.json
  *
  * Config (pick one, in priority order):
  *  1. LLAMA_SWITCH_HOST env var (host:port or just host)
@@ -17,7 +17,7 @@
  *  3. Default: localhost:8090
  *
  * Config file format:
- *   { "host": "<llama-server-host>", "port": 8090, "provider": "llama-cpp" }
+ *   { "host": "<llama-switch-host>", "port": 8090, "provider": "llama-cpp" }
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -29,6 +29,18 @@ import { join } from "node:path";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface PiModelEntry {
+    id: string;
+    name: string;
+    reasoning?: boolean;
+    input?: string[];
+    contextWindow?: number;
+    maxTokens?: number;
+    cost?: Record<string, number>;
+    thinkingLevelMap?: Record<string, string | null>;
+    compat?: Record<string, unknown>;
+}
+
 interface AdminModel {
     name: string;        // admin alias (used in /switch/<name>)
     display: string;     // display name
@@ -37,6 +49,8 @@ interface AdminModel {
     context_window: number;
     vision: boolean;
     thinking: boolean;
+    endpoint_port?: number;
+    pi_model?: PiModelEntry;
 }
 
 interface AdminStatus {
@@ -175,34 +189,38 @@ function saveModelsJson(data: Record<string, unknown>): void {
 }
 
 /**
- * Provision models from admin API into Pi's models.json and settings.json.
+ * Upsert full model metadata from the admin API into Pi's models.json and settings.json.
+ *
+ * Newer llama-switch managers include `pi_model`, which is the exact Pi model
+ * entry generated from the server manifest. That preserves reasoning toggles,
+ * thinking level maps, compatibility flags, multimodal input, and token limits
+ * on remote Pi clients. Older managers fall back to the historical minimal shape.
  */
-async function provisionModels(
+async function syncPiModels(
     config: LlamaSwitchConfig,
     ctx: ExtensionContext,
-): Promise<{ added: string[]; skipped: string[] }> {
+): Promise<{ added: string[]; updated: string[]; unchanged: string[]; removedProviders: string[] }> {
     const modelsData = await fetchAdmin<{ models: AdminModel[] }>(config, "/models");
     if (!modelsData?.models?.length) {
         ctx.ui.notify("No models available from admin API", "warning");
-        return { added: [], skipped: [] };
+        return { added: [], updated: [], unchanged: [], removedProviders: [] };
     }
 
     const modelsJson = loadModelsJson();
-    const provider = modelsJson.providers?.[config.provider] as Record<string, unknown> | undefined;
-    const existingModels = (provider?.models as Array<{ id?: string }> | undefined)?.map(
-        (m) => m.id,
-    ) ?? [];
+    modelsJson.providers = modelsJson.providers ?? {};
+
+    const endpointPort = modelsData.models.find((m) => m.endpoint_port)?.endpoint_port ?? 8080;
+    const existingProvider = modelsJson.providers[config.provider] as Record<string, unknown> | undefined;
+    const existingModels = (existingProvider?.models as Array<PiModelEntry> | undefined) ?? [];
+    const existingById = new Map(existingModels.map((m) => [m.id, m]));
 
     const added: string[] = [];
-    const skipped: string[] = [];
+    const updated: string[] = [];
+    const unchanged: string[] = [];
+    const removedProviders: string[] = [];
 
-    for (const model of modelsData.models) {
-        if (existingModels.includes(model.pi_id)) {
-            skipped.push(model.pi_id);
-            continue;
-        }
-
-        const piModel: Record<string, unknown> = {
+    const syncedModels = modelsData.models.map((model) => {
+        const piModel: PiModelEntry = model.pi_model ?? {
             id: model.pi_id,
             name: model.pi_name,
             reasoning: model.thinking,
@@ -212,50 +230,79 @@ async function provisionModels(
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         };
 
-        if (!provider) {
-            modelsJson.providers = modelsJson.providers ?? {};
-            modelsJson.providers[config.provider] = {
-                baseUrl: `http://${config.host}:8080/v1`,
-                api: "openai-completions",
-                apiKey: "none",
-                compat: {
-                    supportsDeveloperRole: false,
-                    supportsReasoningEffort: false,
-                },
-                models: [],
-            };
+        const previous = existingById.get(piModel.id);
+        if (!previous) {
+            added.push(piModel.id);
+        } else if (JSON.stringify(previous) !== JSON.stringify(piModel)) {
+            updated.push(piModel.id);
+        } else {
+            unchanged.push(piModel.id);
         }
+        return piModel;
+    });
 
-        const providerModels = (modelsJson.providers[config.provider] as any).models as Array<any> | undefined;
-        if (!providerModels) {
-            (modelsJson.providers[config.provider] as any).models = [];
+    modelsJson.providers[config.provider] = {
+        ...(existingProvider ?? {}),
+        baseUrl: `http://${config.host}:${endpointPort}/v1`,
+        api: "openai-completions",
+        apiKey: "none",
+        compat: {
+            supportsDeveloperRole: false,
+            supportsReasoningEffort: false,
+            ...((existingProvider?.compat as Record<string, unknown> | undefined) ?? {}),
+        },
+        models: syncedModels,
+    };
+
+    for (const key of Object.keys(modelsJson.providers as Record<string, unknown>)) {
+        if (key.startsWith(`${config.provider}-`) && key !== config.provider) {
+            delete (modelsJson.providers as Record<string, unknown>)[key];
+            removedProviders.push(key);
         }
-        (modelsJson.providers[config.provider] as any).models.push(piModel);
-        added.push(model.pi_id);
     }
 
-    if (added.length > 0) {
-        saveModelsJson(modelsJson);
+    saveModelsJson(modelsJson);
 
-        // Also add to enabledModels in settings.json
-        const settingsPath = join(getAgentDir(), "settings.json");
-        if (existsSync(settingsPath)) {
-            const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-            const enabledModels = settings.enabledModels as string[] | undefined;
-            if (enabledModels) {
-                for (const id of added) {
-                    const fq = `${config.provider}/${id}`;
-                    if (!enabledModels.includes(fq)) {
-                        enabledModels.push(fq);
-                    }
-                }
-                writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+    // Also add to enabledModels in settings.json.
+    const settingsPath = join(getAgentDir(), "settings.json");
+    if (existsSync(settingsPath)) {
+        const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+        let enabledModels = settings.enabledModels as string[] | undefined;
+        if (enabledModels) {
+            if (removedProviders.length > 0) {
+                enabledModels = enabledModels.filter(
+                    (entry) => !removedProviders.some((provider) => entry.startsWith(`${provider}/`)),
+                );
             }
+            for (const model of syncedModels) {
+                const fq = `${config.provider}/${model.id}`;
+                if (!enabledModels.includes(fq)) {
+                    enabledModels.push(fq);
+                }
+            }
+            settings.enabledModels = enabledModels;
+            writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
         }
     }
 
-    return { added, skipped };
+    return { added, updated, unchanged, removedProviders };
 }
+
+async function offerReload(ctx: ExtensionContext): Promise<void> {
+    const reload = (ctx as unknown as { reload?: () => Promise<void> }).reload;
+    if (typeof reload !== "function") {
+        ctx.ui.notify("Run /reload to apply the synced model config.", "info");
+        return;
+    }
+
+    const ok = await ctx.ui.confirm("Reload Pi", "Reload Pi now to apply synced model config?");
+    if (ok) {
+        await reload.call(ctx);
+    } else {
+        ctx.ui.notify("Run /reload later to apply the synced model config.", "info");
+    }
+}
+
 
 // ── Extension State ──────────────────────────────────────────────────────────
 
@@ -323,7 +370,7 @@ export default function (pi: ExtensionAPI) {
         const adminName = state.modelMap.get(event.model.id);
         if (!adminName) {
             ctx.ui.notify(
-                `[llama-switch] Model "${event.model.id}" not on server. Run /llama-switch to provision.`,
+                `[llama-switch] Model "${event.model.id}" not on server. Run /llama-switch sync, then /reload.`,
                 "warning",
             );
             return;
@@ -359,13 +406,30 @@ export default function (pi: ExtensionAPI) {
         description: "Switch llama.cpp model via admin API",
         getArgumentCompletions: (prefix: string): Array<{ value: string; label: string }> | null => {
             if (prefix === "") return null;
-            const items = state.models.map((m) => ({ value: m.name, label: m.display }));
+            const commands = [
+                { value: "sync", label: "sync Pi model config from admin API" },
+                { value: "provision", label: "alias for sync" },
+            ];
+            const items = [
+                ...commands,
+                ...state.models.map((m) => ({ value: m.name, label: m.display })),
+            ];
             const filtered = items.filter((i) => i.value.startsWith(prefix));
             return filtered.length > 0 ? filtered : null;
         },
         handler: async (args, ctx) => {
             if (args?.trim()) {
                 const target = args.trim();
+                if (target === "sync" || target === "provision") {
+                    const result = await syncPiModels(state.config, ctx);
+                    ctx.ui.notify(
+                        `Synced Pi config: ${result.added.length} added, ${result.updated.length} updated, ${result.unchanged.length} unchanged, ${result.removedProviders.length} old providers removed`,
+                        "success",
+                    );
+                    await offerReload(ctx);
+                    return;
+                }
+
                 const model = state.models.find(
                     (m) => m.name === target || m.pi_id === target,
                 );
@@ -430,15 +494,15 @@ export default function (pi: ExtensionAPI) {
         }
 
         if (selected === "__provision") {
-            const ok = await ctx.ui.confirm("Provision models", "Add admin API models to Pi's models.json?");
+            const ok = await ctx.ui.confirm("Sync Pi model config", "Upsert full admin API model metadata into Pi's models.json?");
             if (!ok) return;
 
-            const { added, skipped } = await provisionModels(state.config, ctx);
-            if (added.length > 0) {
-                ctx.ui.notify(`Added ${added.length} model(s). Run /reload to apply.`, "success");
-            } else if (skipped.length > 0) {
-                ctx.ui.notify(`All ${skipped.length} model(s) already provisioned`, "info");
-            }
+            const result = await syncPiModels(state.config, ctx);
+            ctx.ui.notify(
+                `Synced Pi config: ${result.added.length} added, ${result.updated.length} updated, ${result.unchanged.length} unchanged, ${result.removedProviders.length} old providers removed`,
+                "success",
+            );
+            await offerReload(ctx);
             return;
         }
 
@@ -482,7 +546,7 @@ export default function (pi: ExtensionAPI) {
                     { value: "---", label: "--- actions ---", description: "" },
                     { value: "__refresh", label: "  ⟳ Refresh status", description: "Re-fetch from admin API" },
                     { value: "__stop", label: "  ■ Stop server", description: "Shutdown llama.cpp server" },
-                    { value: "__provision", label: "  ⊕ Provision models to Pi", description: "Add admin API models to models.json" },
+                    { value: "__provision", label: "  ⊕ Sync Pi model config", description: "Upsert full models.json metadata" },
                     {
                         value: "__config",
                         label: `  ⚙ ${state.config.host}:${state.config.port}`,
@@ -593,6 +657,7 @@ export default function (pi: ExtensionAPI) {
                 status: "status",
                 list: "list",
                 stop: "stop",
+                sync: "sync",
             } as const),
             model: Type.Optional(
                 Type.String({
@@ -648,6 +713,17 @@ export default function (pi: ExtensionAPI) {
                     content: [{ type: "text", text: `Failed to stop: ${res.message ?? "unknown"}` }],
                     details: { stopped: false },
                     isError: true,
+                };
+            }
+
+            if (params.action === "sync") {
+                const result = await syncPiModels(state.config, ctx);
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Synced Pi config: ${result.added.length} added, ${result.updated.length} updated, ${result.unchanged.length} unchanged, ${result.removedProviders.length} old providers removed. Run /reload to apply.`,
+                    }],
+                    details: result,
                 };
             }
 

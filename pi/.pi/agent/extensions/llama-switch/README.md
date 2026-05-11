@@ -11,7 +11,7 @@ Pi extension that integrates with [llama-switch-manager](https://github.com/…)
 | **Keyboard shortcut** | `Ctrl+Shift+L` quick-opens the overlay |
 | **Agent tool** | The LLM can call `llama_switch(action="switch", model="...")` to switch models itself |
 | **Inline footer status** | Status indicator (`●`/`⟳`/`◌`) shown inline next to the model name in the footer |
-| **Provisioning** | Add new models from the admin API directly into Pi's config |
+| **Config sync** | Upsert full model metadata from the admin API into Pi's config, including reasoning/thinking toggles |
 
 ## Prerequisites
 
@@ -98,7 +98,7 @@ In the overlay:
 Overlay actions:
 - **Refresh status** — re-fetch from admin API
 - **Stop server** — shutdown llama.cpp (with confirmation)
-- **Provision models to Pi** — add admin API models to `models.json` and `enabledModels` in `settings.json` (then run `/reload`)
+- **Sync Pi model config** — upsert admin API models into `models.json` and `enabledModels` in `settings.json`, including `reasoning`, `thinkingLevelMap`, `compat`, image support, context, and max-token metadata (then reload Pi)
 - **Show config** — display current host/port/provider
 
 #### Via Keyboard Shortcut
@@ -140,17 +140,19 @@ When running Pi on a laptop or other device on the same LAN:
 
 1. Set `LLAMA_SWITCH_HOST=<llama-server-host>` (desktop's IP) in the environment
 2. The extension connects to the desktop's admin API
-3. Model switches, status, and provisioning all work remotely
+3. Model switches, status, and config sync all work remotely
 4. Pi's `llama-cpp` provider should point at `http://<llama-server-host>:8080/v1`
 
-### Provisioning New Models
+### Syncing Model Config on Remote Pi Devices
 
-When you add a model to `~/.local/llama-switch/models.json` but haven't run `llama-switch pi-update`:
+When you add or change a model in `~/.local/llama-switch/models.json` on the desktop/server, remote Pi clients can pull the updated model metadata over the LAN:
 
-1. Run `/llama-switch`
-2. Select **Provision models to Pi**
-3. Confirm — the extension adds the model to `models.json` and `settings.json`
-4. Run `/reload` to pick up the new model
+1. Ensure the desktop/server is running `llama-switch-manager.service` and the updated manager code.
+2. On the remote device, set `LLAMA_SWITCH_HOST=<desktop-ip>` or create `~/.pi/agent/llama-switch.json`.
+3. Run `/llama-switch sync` or open `/llama-switch` and select **Sync Pi model config**.
+4. Confirm reload when prompted, or run `/reload` manually.
+
+The sync upserts the full Pi model entries from the admin API, including `reasoning`, `thinkingLevelMap`, `compat.thinkingFormat`, `compat.maxTokensField`, image support, context, and max-token metadata. It updates existing entries instead of skipping them, removes old `llama-cpp-*` per-model providers, and keeps `enabledModels` aligned so reasoning-level changes propagate to already-provisioned models.
 
 ## Architecture
 
@@ -168,6 +170,11 @@ You (Pi)                    llama-switch-manager          llama.cpp
     │                              │                          │
     │  setModel()                  │                          │
     │  (update Pi active model)    │                          │
+    │                              │                          │
+    │  /llama-switch sync          │  GET /models             │
+    ├─────────────────────────────►│                          │
+    │  upsert full Pi metadata     │                          │
+    │  into local models.json      │                          │
 ```
 
 ### Key Design Decisions
@@ -190,6 +197,6 @@ You (Pi)                    llama-switch-manager          llama.cpp
 |---------|-----|
 | Footer shows `llama-switch: ?` | Check that llama-switch-manager is running (`systemctl --user status llama-switch-manager`) |
 | Footer shows wrong host | Check `~/.pi/agent/llama-switch.json` or `LLAMA_SWITCH_HOST` env var |
-| Model not found error | Run `/llama-switch` → Provision models, then `/reload` |
+| Model not found error | Run `/llama-switch sync`, then reload Pi |
 | Switch fails | Check manager logs: `~/.local/llama-switch/manager.log` |
 | Extension not loading | Verify `~/.pi/agent/extensions/llama-switch/index.ts` exists; run `/reload` |
