@@ -160,6 +160,25 @@ async function stopServer(config: LlamaSwitchConfig): Promise<SwitchResult> {
     }
 }
 
+async function reloadServerManifest(config: LlamaSwitchConfig): Promise<SwitchResult> {
+    try {
+        const resp = await fetch(adminUrl(config, "/reload-models"), {
+            method: "POST",
+            signal: AbortSignal.timeout(10000),
+        });
+        const body = await resp.text();
+        return {
+            ok: resp.ok,
+            status: resp.ok ? "reloaded" : "error",
+            message: body,
+        };
+    } catch (err) {
+        // Older managers do not have /reload-models. Refresh/sync can still use
+        // whatever the running admin API currently exposes.
+        return { ok: false, status: "error", message: String(err) };
+    }
+}
+
 async function pollUntilReady(
     config: LlamaSwitchConfig,
     expectedModel: string,
@@ -200,6 +219,7 @@ async function syncPiModels(
     config: LlamaSwitchConfig,
     ctx: ExtensionContext,
 ): Promise<{ added: string[]; updated: string[]; unchanged: string[]; removedProviders: string[] }> {
+    await reloadServerManifest(config);
     const modelsData = await fetchAdmin<{ models: AdminModel[] }>(config, "/models");
     if (!modelsData?.models?.length) {
         ctx.ui.notify("No models available from admin API", "warning");
@@ -470,9 +490,13 @@ export default function (pi: ExtensionAPI) {
 
         // Handle actions
         if (selected === "__refresh") {
+            const reload = await reloadServerManifest(state.config);
             await refreshState();
             updateStatus(ctx);
-            ctx.ui.notify("Status refreshed", "info");
+            ctx.ui.notify(
+                reload.ok ? `Models/status refreshed (${state.models.length} models)` : `Status refreshed (${state.models.length} models); server manifest reload unavailable`,
+                reload.ok ? "success" : "info",
+            );
             return;
         }
 
@@ -544,7 +568,7 @@ export default function (pi: ExtensionAPI) {
 
                 const actionItems: SelectItem[] = [
                     { value: "---", label: "--- actions ---", description: "" },
-                    { value: "__refresh", label: "  ⟳ Refresh status", description: "Re-fetch from admin API" },
+                    { value: "__refresh", label: "  ⟳ Refresh models/status", description: "Reload server manifest, then re-fetch admin API" },
                     { value: "__stop", label: "  ■ Stop server", description: "Shutdown llama.cpp server" },
                     { value: "__provision", label: "  ⊕ Sync Pi model config", description: "Upsert full models.json metadata" },
                     {

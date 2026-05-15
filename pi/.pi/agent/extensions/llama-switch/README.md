@@ -96,9 +96,9 @@ In the overlay:
 - **Tab** (with args) Complete model names
 
 Overlay actions:
-- **Refresh status** — re-fetch from admin API
+- **Refresh models/status** — ask the server to reload its manifest from disk, then re-fetch admin API state
 - **Stop server** — shutdown llama.cpp (with confirmation)
-- **Sync Pi model config** — upsert admin API models into `models.json` and `enabledModels` in `settings.json`, including `reasoning`, `thinkingLevelMap`, `compat`, image support, context, and max-token metadata (then reload Pi)
+- **Sync Pi model config** — reload server manifest, then upsert admin API models into `models.json` and `enabledModels` in `settings.json`, including `reasoning`, `thinkingLevelMap`, `compat`, image support, context, and max-token metadata (then reload Pi)
 - **Show config** — display current host/port/provider
 
 #### Via Keyboard Shortcut
