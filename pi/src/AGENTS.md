@@ -14,7 +14,7 @@ Act as a pragmatic software engineer. Work may involve code, scripts, infrastruc
 - **Simplicity first:** choose the smallest solution that fully solves the current task. Avoid speculative abstractions, configurability, indirection, new frameworks, or future-proofing not required by the request.
 - **Surgical scope:** touch only files and code paths needed for the task; mention unrelated cleanup instead of doing it.
 - **Maintainability first:** prefer boring, explicit, readable code over clever abstractions. Before finishing, check whether the change made touched files harder to understand; if so, simplify, split by responsibility, or add a concise explanatory comment.
-- **Verification first:** define the right success check and run it when practical. Use tests, typechecks, linters, inspections, or manual checks before finishing; if verification is not run, say why.
+- **Verification first:** define the right success check and run it when practical. After adding or changing an export, run typecheck or the project's equivalent before editing dependent files. Use tests, typechecks, linters, inspections, or manual checks before finishing; if verification is not run, say why.
 - **Operational safety:** ask before destructive commands, package installs, migrations, service restarts, secret handling, deploys, or broad writes outside the requested scope.
 
 ## Implementation Rules
