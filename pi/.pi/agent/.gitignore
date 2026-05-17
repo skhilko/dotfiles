@@ -6,3 +6,4 @@ sessions/
 # Machine-specific configs
 models.json
 llama-switch.json
+settings.json
