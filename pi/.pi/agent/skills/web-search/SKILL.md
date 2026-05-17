@@ -1,10 +1,11 @@
 ---
-name: bx
+name: web-search
 description: >-
-  Web search and web research with bx/Brave Search CLI. Use when needing current
-  web search, grounding, RAG, fact-checking, documentation lookup, or reading web
-  pages. Returns pre-extracted, token-budgeted readable content; prefer bx
-  "query" and URL-as-query for reading specific results.
+  Search the live web, look up documentation, read web pages, fact-check claims,
+  find current information, and browse news. Use when the user asks to search,
+  find online, look something up, check current docs, read a URL, verify facts
+  against the web, check recent events or news, or needs information beyond
+  training data.
 ---
 
 # bx — Brave Search CLI
