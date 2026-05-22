@@ -18,6 +18,7 @@
     ],
     "modules-right": [
         "custom/voxtype",
+        "custom/llama",
 	    "custom/shade",
         "idle_inhibitor",
         "pulseaudio",
@@ -227,5 +228,11 @@
            "stopped": "\uf131"
        },
        "tooltip": true
+   },
+   "custom/llama": {
+       "exec": "waybar-llama-stats",
+       "return-type": "json",
+       "tooltip": true,
+       "on-click-right": "waybar-llama-menu"
    }
 }

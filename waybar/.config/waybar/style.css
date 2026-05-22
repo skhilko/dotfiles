@@ -253,6 +253,25 @@ tooltip label {
     color: @yellow;
 }
 
+/* -----------------------------------------------------
+ * llama.cpp server module
+ * ----------------------------------------------------- */
+
+#custom-llama {
+    color: @green;
+    padding: 0 8px;
+}
+
+#custom-llama.busy {
+    background-color: rgba(250, 179, 135, 0.16);
+    border-color: rgba(250, 179, 135, 0.40);
+    color: @peach;
+}
+
+#custom-llama.down {
+    color: @overlay1;
+}
+
 #battery {
     color: @green;
 }
