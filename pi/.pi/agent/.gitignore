@@ -7,3 +7,6 @@ sessions/
 models.json
 llama-switch.json
 settings.json
+
+# Symlink to private vault — direction files stay in brain/vault/, never tracked
+direction
