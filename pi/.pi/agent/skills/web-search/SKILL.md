@@ -1,85 +1,21 @@
 ---
 name: web-search
-description: >-
-  Search the live web, look up documentation, read web pages, fact-check claims,
-  find current information, and browse news. Use when the user asks to search,
-  find online, look something up, check current docs, read a URL, verify facts
-  against the web, check recent events or news, or needs information beyond
-  training data.
+description: "Search the live web, look up documentation, read web pages, fact-check claims, find current information, and browse news. USE WHEN: the user asks to search, find online, look something up, check docs, read a URL, verify facts, or check recent events. Also invoke proactively when you need to verify information, are unsure about an API or config, information may be outdated, a project changed recently, or you want to cross-check a claim before answering."
 ---
 
-# bx — Brave Search CLI
+# Web Search
 
-Official CLI docs: <https://github.com/brave/brave-search-cli/blob/main/README.md>
+Load [references/cli-reference.md](references/cli-reference.md) when you need: the full Goggles DSL (wildcards, stdin piping, file-based goggles), POI details by ID, or config/proxy internals.
 
-**Use `bx` for all web searches.** Default to `bx "query"` (`context`): it searches and returns pre-extracted, token-budgeted readable page content, so you usually do **not** need a separate browser/fetch/open step. For agent use, keep output bounded (for example `--max-urls 5 --max-tokens 4096`) and inspect `.grounding.generic[]`. Use `bx web` only for traditional/raw result triage, search operators, or result filters. If `bx` is not found, install it: `curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh`
+**Tool:** `bx` (Brave Search CLI). Requires a Brave Search API key.
 
-> **Requires**: [Brave Search API Key](https://api.search.brave.com) + `bx` binary
+## Core Workflow
 
-## Quick Start
-
-```bash
-# Install (macOS/Linux)
-curl -fsSL https://raw.githubusercontent.com/brave/brave-search-cli/main/scripts/install.sh | sh
-
-# Configure API key (get one at https://api-dashboard.search.brave.com)
-bx config set-key              # interactive (avoids shell history)
-# or: bx config set-key YOUR_API_KEY
-# or: export BRAVE_SEARCH_API_KEY=YOUR_KEY
-
-# Search (default = bx context "query")
-bx "your search query"
-```
-
-## Reading / Visiting Search Results
-
-`bx "query"` (`context`) already searches and extracts readable page text into `.grounding.generic[].snippets[]`. Prefer it over `bx web` when you need to *read* results; `bx web` is for raw rankings/result types and usually requires a second step to get page text. Context snippets can include plain text, code, tables, and JSON-like structured data. Start with a few URLs/snippets to avoid overwhelming output, then raise limits only when needed.
-
-To "open" or read one specific result URL more deeply, pass the URL back to `context`:
-
-```bash
-bx "https://docs.python.org/3/library/string.templatelib.html" \
-  --max-urls 1 --max-tokens 8192 --max-tokens-per-url 8192 \
-  --max-snippets 10 --threshold strict
-```
-
-Recommended search → read loop:
-
-```bash
-# 1. Search with extracted snippets
-bx "Python 3.14 t-strings official documentation examples" --count 20 --max-urls 5 --max-tokens 4096
-
-# 2. If results are weak, increase candidate recall but keep output small
-bx "Python 3.14 t-strings official documentation examples" --count 50 --max-urls 5 --threshold lenient
-
-# 3. If you need authoritative/source-specific pages, constrain early
-#    (broad web searches may surface tutorials/blogs before official docs)
-bx "Python 3.14 t-strings official documentation examples" --include-site docs.python.org --max-urls 5
-
-# 4. Read/open a chosen URL by querying the URL itself
-bx "https://docs.python.org/3/library/string.templatelib.html" --max-urls 1 --max-tokens-per-url 8192 --max-snippets-per-url 10
-```
-
-There is no separate `bx open`/`bx fetch` command. Try URL-as-`context` before inventing `curl`/HTML scraping, but verify the returned `.grounding.generic[].url` matches the requested page/domain. Fall back to the canonical raw/source URL or another fetch/extraction method when `bx` returns no usable content **or an obviously different/mismatched page** (for example: not indexed, requires login, heavy JavaScript, paywall, blocked page, or some GitHub `blob`/`raw` URLs).
-
-Use `jq` to inspect context results:
-
-```bash
-bx "query" --max-urls 5 | jq -r '
-  .grounding.generic[]
-  | "\n\(.title)\n\(.url)",
-    (.snippets[:2][]? | " - " + (gsub("\\s+"; " ")[:500]))
-'
-```
-
-If you only need to triage URLs before choosing one to read, use `web` with raw-result controls, then pass the chosen URL back to `context`:
-
-```bash
-bx web "site:docs.python.org Python 3.14 t-strings" --operators --count 5 --extra-snippets \
-  | jq -r '.web.results[] | "\n\(.title)\n\(.url)\n\(.description)"'
-```
-
-Search operators such as `site:`, `intitle:`, and similar Brave operators are a `web` feature; use `bx web ... --operators` for operator-scoped triage, then pass a chosen URL back to `context` to read it. For source-constrained readable content, prefer `bx "query" --include-site DOMAIN` or Goggles.
+1. **Search with extracted content** — `bx "query" --max-urls 5 --max-tokens 4096`. The default `context` command returns pre-extracted, token-budgeted page text in `.grounding.generic[].snippets[]`, so you usually do not need a separate fetch step.
+2. **Triage raw results first** — when you need to scan titles/URLs before picking one, use `bx web "query" --count 5`. Then pass a chosen URL back to `context` to read it.
+3. **Read a specific URL deeply** — pass the URL as the query to `context`. See the Reading section below for the full pattern.
+4. **Narrow when results are too broad** — tighten with `--threshold strict`, constrain domains with `--include-site`, or use Goggles.
+5. **Fall back when `bx` returns nothing useful** — paywalls, login walls, heavy JavaScript, or unindexed pages. Use `curl` or another fetch method as last resort.
 
 ## When to Use Which Command
 
@@ -87,92 +23,53 @@ Search operators such as `site:`, `intitle:`, and similar Brave operators are a 
 |--|--|--|
 | Look up docs, errors, code patterns | `bx "query"` | Pre-extracted text, token-budgeted (default) |
 | Search specific sites and read content | `bx "query" --include-site docs.rs` | Context extraction + domain allowlist |
-| Use Brave search operators or result filters | `bx web "site:docs.rs axum" --operators` | Raw triage; pass chosen URLs back to `context` |
-| Traditional search results | `bx web "query"` | All result types (web, news, discussions, etc.) |
+| Use search operators (`site:`, `intitle:`) | `bx web "site:docs.rs" --operators` | Requires `--operators` flag; raw triage, then pass URLs to `context` |
+| Traditional search results | `bx web "query"` | All result types (web, news, discussions) |
 | Find discussions/forums | `bx web "query" --result-filter discussions` | Forums often have solutions |
 | Latest news / recent events | `bx news "query" --freshness pd` | Fresh info beyond training data |
-| Find images | `bx images "query"` | Up to 200 results |
-| Find videos | `bx videos "query"` | Duration, views, creator |
-| Local businesses / places | `bx places "coffee" --location "San Francisco CA US"` | 200M+ POIs |
-| Place details/descriptions | `bx pois ID`; `bx descriptions ID` | Use IDs from `places` results |
-| Boost/filter domains or paths | `bx "query" --goggles ...` | Full custom re-ranking/allowlisting |
-
-## Commands
-
-| Command | Description | Output path |
-|--|--|--|
-| `context` | **Default.** RAG/LLM grounding — pre-extracted web content | `.grounding.generic[]` -> `{url, title, snippets[]}` |
-| `web` | Web search — all result types/operators/filters | `.web.results[]`, `.news.results[]`, etc. |
-| `news` | News articles with freshness filters | `.results[]` -> `{title, url, age}` |
-| `images` | Image search (up to 200 results) | `.results[]` -> `{title, url, thumbnail.src}` |
-| `videos` | Video search with duration/views | `.results[]` -> `{title, url, video.duration}` |
-| `places` | Local place/POI search (200M+ POIs) | `.results[]` -> `{title, postal_address, contact}` |
-| `pois` | POI details by ID | Use IDs from `places` |
-| `descriptions` | AI-generated POI descriptions by ID | `.results[].description` |
-| `config` | Manage API key and settings | `set-key`, `show-key`, `path`, `show` |
-
-## Response Shapes
-
-**`bx "query"`** (context — default, recommended)
-```json
-{
-  "grounding": {
-    "generic": [
-      { "url": "...", "title": "...", "snippets": ["extracted content...", "..."] }
-    ]
-  },
-  "sources": {
-    "https://example.com": { "title": "...", "hostname": "...", "age": ["...", "2025-01-15", "392 days ago"] }
-  }
-}
-```
-
-**`bx web "query"`** (full search results)
-```json
-{
-  "web": { "results": [{"title": "...", "url": "...", "description": "..."}] },
-  "news": { "results": [...] },
-  "videos": { "results": [...] },
-  "discussions": { "results": [...] }
-}
-```
+| Location-aware search | `bx "query" --city "Paris" --lat 48.85 --long 2.35` | `--city`, `--state`, `--lat`, `--long`, `--postal-code` |
+| Find images | `bx images "query"` | Up to 200 results with thumbnails |
+| Find videos | `bx videos "query"` | Results with duration, views, creator |
+| Find places / businesses | `bx places "coffee" --location "San Francisco"` | Local POI search |
+| Refine a search query | `bx suggest "query"` | Autocomplete suggestions |
+| Check spelling | `bx spellcheck "qurey"` | Corrects misspelled queries |
+| Boost/filter domains or paths | `bx "query" --goggles ...` | Custom re-ranking/allowlisting |
 
 ## Token Budget Control
 
-Control search breadth and output size for context (the default command):
+| Flag | Default | What it does |
+|--|--|--|
+| `--count` | 20 | Results to consider before extracting (1-50) |
+| `--max-tokens` | 8192 | Total tokens to return (1024-32768) |
+| `--max-tokens-per-url` | 4096 | Max per URL (512-8192) |
+| `--max-urls` | 20 | Max URLs in response (1-50) |
+| `--max-snippets` | 50 | Max snippets across all URLs |
+| `--threshold` | balanced | Relevance: `strict`, `balanced`, `lenient` |
 
-| Flag | Short alias | Default | Description |
-|--|--|--|--|
-| `--count` | — | 20 | Search results to consider before extracting context (1-50) |
-| `--maximum-number-of-tokens` | `--max-tokens` | 8192 | Approximate total tokens (1024-32768) |
-| `--maximum-number-of-tokens-per-url` | `--max-tokens-per-url` | 4096 | Max tokens per URL (512-8192) |
-| `--maximum-number-of-urls` | `--max-urls` | 20 | Max URLs in response (1-50) |
-| `--maximum-number-of-snippets` | `--max-snippets` | 50 | Max snippets across all URLs |
-| `--maximum-number-of-snippets-per-url` | `--max-snippets-per-url` | — | Max snippets per URL |
-| `--context-threshold-mode` | `--threshold` | balanced | Relevance: `strict`, `balanced`, `lenient` |
+## Parsing Output
+
+All output is JSON. Use `jq` to read it:
 
 ```bash
-bx "topic" --max-tokens 4096 --max-tokens-per-url 1024 --max-urls 5 --threshold strict
+# Pretty-print snippets from context results
+bx "query" --max-urls 5 | jq -r '.grounding.generic[] | "\n\(.title)\n\(.url)\n" + (.snippets[:2][]? | "  - " + .)'
+
+# Triage raw web results
+bx web "query" --count 5 | jq -r '.web.results[] | "\n\(.title)\n\(.url)"'
 ```
 
-## Goggles — Custom Ranking
+## Goggles — Boost or Block Domains
 
-Goggles let you control which sources appear in results. Boost official docs, suppress SEO spam, or build focused search scopes. **No other search tool offers this.** Supported on `context`, `web`, and `news`.
-
-### Domain Shortcuts
-
+Quick shortcuts:
 ```bash
-# Allowlist — only results from these domains
+# Only these domains
 bx "rust axum" --include-site docs.rs --include-site github.com
 
-# Blocklist — exclude specific domains
+# Exclude a domain
 bx "python tutorial" --exclude-site example.com
 ```
 
-`--include-site`, `--exclude-site`, and `--goggles` are mutually exclusive.
-
-### Inline Rules
-
+Inline rules (mutually exclusive with `--include-site`/`--exclude-site`):
 ```bash
 # Boost official docs, demote blog posts
 bx "axum middleware tower" \
@@ -181,86 +78,82 @@ $boost=3,site=github.com
 /docs/$boost=5
 /blog/$downrank=3' --max-tokens 4096
 
-# Allowlist mode — only include matched sites
+# Allowlist mode — only matched sites
 bx "Python asyncio patterns" \
-  --goggles '$boost=5,site=docs.python.org
-$boost=5,site=peps.python.org
-$discard'
+  --goggles '$discard
+$boost,site=docs.python.org
+$boost,site=peps.python.org' --max-tokens 4096
 ```
 
-### DSL Quick Reference
+Quick DSL: `$boost=N,site=DOMAIN` (promote), `$downrank=N,site=DOMAIN` (demote), `$discard,site=DOMAIN` (remove), `/path/$boost=N` (path matching), `$discard` as last rule for allowlist mode. See [references](references/cli-reference.md) for wildcards, stdin piping, and file-based goggles.
 
-| Rule | Effect | Example |
-|--|--|--|
-| `$boost=N,site=DOMAIN` | Promote domain (N=1-10) | `$boost=3,site=docs.rs` |
-| `$downrank=N,site=DOMAIN` | Demote domain (N=1-10) | `$downrank=5,site=example.com` |
-| `$discard,site=DOMAIN` | Remove domain entirely | `$discard,site=example.com` |
-| `/path/$boost=N` | Boost matching URL paths | `/docs/$boost=5` |
-| `*pattern*$boost=N` | Wildcard URL matching | `*api*$boost=3` |
-| Generic `$discard` | Allowlist mode — discard unmatched | `$discard` (as last rule) |
+## JSON Response Shapes
 
-Separate rules with newlines. Full DSL and pattern syntax: [goggles-quickstart](https://github.com/brave/goggles-quickstart).
-
-### Piping Rules via Stdin
-
-```bash
-echo '$boost=5,site=docs.rs
-$boost=5,site=crates.io
-$boost=3,site=github.com' | bx "axum middleware" --goggles @- --max-tokens 4096
+**`bx "query"`** (context — default):
+```json
+{
+  "grounding": { "generic": [{ "url": "...", "title": "...", "snippets": ["..."] }] },
+  "sources": { "https://...": { "title": "...", "hostname": "...", "age": [...] } }
+}
 ```
 
-Use `@/path/to/file` to reuse a goggle across queries. Hosted raw `.goggle` URLs are also supported.
-
-## Agent Workflow Examples
-
-**Debugging an error:**
-```bash
-bx "Python TypeError cannot unpack non-iterable NoneType" --max-tokens 4096
-```
-
-**Corrective RAG loop:**
-```bash
-# 1. Broad search
-bx "axum middleware authentication" --max-tokens 4096
-# 2. Too general? Narrow with strict threshold
-bx "axum middleware tower layer authentication example" --threshold strict --max-tokens 4096
-# 3. Need authoritative sources? Constrain by domain
-bx "axum middleware tower layer authentication example" --include-site docs.rs --include-site github.com --max-tokens 4096
-```
-
-**Checking for breaking changes before upgrading:**
-```bash
-bx "Next.js 15 breaking changes migration guide" --max-tokens 8192
-bx news "Next.js 15 release" --freshness pm
+**`bx web "query"`** (raw results):
+```json
+{
+  "web": { "results": [{ "title": "...", "url": "...", "description": "..." }] },
+  "news": { "results": [...] },
+  "videos": { "results": [...] },
+  "discussions": { "results": [...] }
+}
 ```
 
 ## Exit Codes
 
-| Code | Meaning | Agent action |
+| Code | Meaning | Action |
 |--|--|--|
 | 0 | Success | Process results |
-| 1 | Client error (bad request) | Fix query/parameters |
-| 2 | Usage error (bad flags) | Fix CLI arguments |
-| 3 | Auth/permission error (401/403) | Check API key: `bx config show-key` |
+| 1 | Client error | Fix query/parameters |
+| 2 | Usage error | Fix CLI arguments |
+| 3 | Auth error (401/403) | Check API key |
 | 4 | Rate limited (429) | Retry after delay |
 | 5 | Server/network error | Retry with backoff |
 
-## Use Cases
+## Reading / Visiting Search Results
 
-- **AI agents / coding assistants**: One-call web search with token-budgeted, RAG-ready content — replaces search + scrape + extract
-- **Fact-checking**: Verify claims against current web content with `bx "query" --threshold strict`
-- **Documentation lookup**: Search official docs with `--include-site` or Goggles domain boosting
-- **Debugging**: Search for error messages and stack traces directly
-- **News monitoring**: Track topics with `bx news "query" --freshness pd`
-- **Local search**: Find businesses and places with `bx places "query" --location "city"`
+Pass a URL as the query to read it deeply:
+```bash
+bx "https://docs.python.org/3/library/..." \
+  --max-urls 1 --max-tokens 8192 --max-tokens-per-url 8192 \
+  --max-snippets 10 --threshold strict
+```
 
-## Notes
+There is no `bx open`/`bx fetch`. Try URL-as-`context` before `curl`, but verify the returned `.grounding.generic[].url` matches the requested page. Fall back to `curl` for paywalls, login walls, heavy JS, unindexed, or mismatched pages.
 
-- **All output is JSON** to stdout; errors go to stderr with a human-readable summary, hints, and the JSON error body
-- **Config precedence**: CLI flag > environment variable > config file > default. Prefer `BRAVE_SEARCH_API_KEY` or `bx config set-key` over `--api-key` because command-line flags are visible in process listings.
-- **Global flags**: `--config PATH`, `--api-key KEY`, `--base-url URL`, `--timeout SECS` (default 30), `--extra KEY=VALUE` (repeatable, auto-types POST values), `--endpoint PATH`
-- **Local proxy**: `BRAVE_SEARCH_BASE_URL`/`--base-url` may point to loopback HTTP URLs such as `http://127.0.0.1:8080/brave`; non-loopback `http://` URLs are rejected.
-- **Search operators**: `site:`, `intitle:`, etc. are for `bx web ... --operators`; use `--include-site`/Goggles on `context` when you need extracted readable content.
-- **Location awareness**: `context` and `web` support `--lat`, `--long`, `--city`, `--state`, `--state-name`, `--loc-country`, `--postal-code`, `--timezone`; `places` uses `--location` or `--latitude`/`--longitude`.
-- **Query equals command name**: use `bx -- web` or `bx context "web"` to search for a word that matches a subcommand.
-- **Help**: `bx --help` for all commands; `bx <command> --help` for per-command flags
+Recommended search → read loop:
+```bash
+# 1. Search with extracted snippets
+bx "Python 3.14 t-strings official docs" --count 20 --max-urls 5 --max-tokens 4096
+# 2. Results weak? Increase recall, keep output small
+bx "Python 3.14 t-strings official docs" --count 50 --max-urls 5 --threshold lenient
+# 3. Need authoritative sources? Constrain by domain
+bx "Python 3.14 t-strings official docs" --include-site docs.python.org --max-urls 5
+# 4. Read a chosen URL by passing the URL to context
+bx "https://docs.python.org/3/library/..." --max-urls 1 --max-tokens-per-url 8192 --max-snippets-per-url 10
+```
+
+## Examples
+
+**User:** *"what are the breaking changes in Next.js 15?"*
+```bash
+bx "Next.js 15 breaking changes migration guide" --max-urls 5 --max-tokens 4096
+```
+
+**User:** *"search for the official Rust async book chapter on channels"*
+```bash
+bx "Rust async book channels" --include-site rust-lang.org --include-site docs.rs --max-urls 5
+```
+
+**User:** *"check the latest news about the Python 3.14 release"*
+```bash
+bx news "Python 3.14 release" --freshness pd
+```
