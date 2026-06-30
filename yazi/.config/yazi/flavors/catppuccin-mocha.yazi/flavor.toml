@@ -11,7 +11,7 @@ preview_hovered = { underline = true }
 
 # Find
 find_keyword  = { fg = "#f9e2af", bold = true, italic = true, underline = true }
-find_position = { fg = "#f5c2e7", bg = "reset", bold = true, italic = true }
+find_position = { fg = "#f2cdcd", bg = "reset", bold = true, italic = true }
 
 # Marker
 marker_copied   = { fg = "#a6e3a1", bg = "#a6e3a1" }
@@ -22,8 +22,6 @@ marker_selected = { fg = "#f9e2af", bg = "#f9e2af" }
 # Tab
 tab_active   = { reversed = true }
 tab_inactive = {}
-tab_width    = 1
-
 # Count
 count_copied   = { fg = "#1e1e2e", bg = "#a6e3a1" }
 count_cut      = { fg = "#1e1e2e", bg = "#f38ba8" }
@@ -76,7 +74,7 @@ progress_error  = { fg = "#f38ba8", bg = "#45475a" }
 
 [pick]
 border   = { fg = "#89b4fa" }
-active   = { fg = "#f5c2e7", bold = true }
+active   = { fg = "#f2cdcd", bold = true }
 inactive = {}
 
 # : }}}
@@ -106,7 +104,7 @@ border = { fg = "#89b4fa" }
 [tasks]
 border  = { fg = "#89b4fa" }
 title   = {}
-hovered = { fg = "#f5c2e7", underline = true }
+hovered = { fg = "#f2cdcd", underline = true }
 
 # : }}}
 
@@ -117,7 +115,7 @@ hovered = { fg = "#f5c2e7", underline = true }
 mask            = { bg = "#313244" }
 cand            = { fg = "#94e2d5" }
 rest            = { fg = "#9399b2" }
-desc            = { fg = "#f5c2e7" }
+desc            = { fg = "#f2cdcd" }
 separator       = "  "
 separator_style = { fg = "#585b70" }
 
@@ -128,7 +126,7 @@ separator_style = { fg = "#585b70" }
 
 [help]
 on      = { fg = "#94e2d5" }
-run     = { fg = "#f5c2e7" }
+run     = { fg = "#f2cdcd" }
 hovered = { reversed = true, bold = true }
 footer  = { fg = "#313244", bg = "#cdd6f4" }
 
@@ -157,14 +155,14 @@ rules = [
 	{ mime = "{audio,video}/*", fg = "#f9e2af" },
 
 	# Archives
-	{ mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "#f5c2e7" },
+	{ mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "#f2cdcd" },
 
 	# Documents
 	{ mime = "application/{pdf,doc,rtf}", fg = "#a6e3a1" },
 
 	# Fallback
-	{ name = "*", fg = "#cdd6f4" },
-	{ name = "*/", fg = "#89b4fa" }
+	{ url = "*", fg = "#cdd6f4" },
+	{ url = "*/", fg = "#89b4fa" }
 ]
 
 # : }}}
