@@ -5,155 +5,460 @@ description: "Search the live web, look up documentation, read web pages, fact-c
 
 # Web Search
 
-Load [references/cli-reference.md](references/cli-reference.md) when you need: the full Goggles DSL (wildcards, stdin piping, file-based goggles), POI details by ID, or config/proxy internals.
+Load [references/cli-reference.md](references/cli-reference.md) for: full Goggles DSL, all `bx` subcommands, token budget flags, `bx` exit codes, **and complete Firecrawl API reference** (all scrape/crawl/map options, actions reference, response structure).
 
-**Tool:** `bx` (Brave Search CLI). Requires a Brave Search API key.
+**Tools:** `bx` (Brave Search CLI) + **Firecrawl** (self-hosted at `http://localhost:3002`).
 
-## Core Workflow
+- `bx` — discovery: search, news, images, video, places, suggestions, spellcheck
+- **Firecrawl** — reading: live page rendering with Playwright, markdown extraction, structured data, site mapping, multi-page crawling, batch scraping
 
-1. **Search with extracted content** — `bx "query" --max-urls 5 --max-tokens 4096`. The default `context` command returns pre-extracted, token-budgeted page text in `.grounding.generic[].snippets[]`, so you usually do not need a separate fetch step.
-2. **Triage raw results first** — when you need to scan titles/URLs before picking one, use `bx web "query" --count 5`. Then pass a chosen URL back to `context` to read it.
-3. **Read a specific URL deeply** — pass the URL as the query to `context`. See the Reading section below for the full pattern.
-4. **Narrow when results are too broad** — tighten with `--threshold strict`, constrain domains with `--include-site`, or use Goggles.
-5. **Fall back when `bx` returns nothing useful** — paywalls, login walls, heavy JavaScript, or unindexed pages. Use `curl` or another fetch method as last resort.
+## The Two-Phase Workflow
 
-## When to Use Which Command
+**Phase 1 — Discover (bx):** Find relevant URLs via search.
+**Phase 2 — Read (Firecrawl):** Fetch live, rendered page content from those URLs.
 
-| Your need | Command | Why |
+This replaces the old single-phase approach where `bx` returned stale index snippets. Firecrawl renders every page in a real browser — JavaScript, anti-bot challenges, dynamic content all handled live.
+
+### Quick Decision Guide
+
+| Scenario | Tool | Why |
+|---|---|---|
+| "Find me X" / "search for Y" | `bx` | Discovery by topic/keywords |
+| "Read this URL" / "what's on this page" | **Firecrawl scrape** | Live, full-page rendering |
+| "Search and show me the content" | **Firecrawl search** | Search + scrape in one call |
+| `bx` snippets are stale/missing | `bx` → **Firecrawl** | Search to find URL, scrape for live content |
+| Known site with JS rendering | **Firecrawl scrape** | Skip search; scrape the URL you know |
+| "Find all product pages on example.com" | **Firecrawl map/crawl** | Discover URLs by crawling, not searching |
+| News, images, video, places | `bx` | Firecrawl search has no media/place results |
+
+## Phase 1 — Search with `bx`
+
+### Core Commands
+
+| Command | Output path | When to use |
 |--|--|--|
-| Look up docs, errors, code patterns | `bx "query"` | Pre-extracted text, token-budgeted (default) |
-| Search specific sites and read content | `bx "query" --include-site docs.rs` | Context extraction + domain allowlist |
-| Use search operators (`site:`, `intitle:`) | `bx web "site:docs.rs" --operators` | Requires `--operators` flag; raw triage, then pass URLs to `context` |
-| Traditional search results | `bx web "query"` | All result types (web, news, discussions) |
-| Find discussions/forums | `bx web "query" --result-filter discussions` | Forums often have solutions |
-| Latest news / recent events | `bx news "query" --freshness pd` | Fresh info beyond training data |
-| Location-aware search | `bx "query" --city "Paris" --lat 48.85 --long 2.35` | `--city`, `--state`, `--lat`, `--long`, `--postal-code` |
-| Find images | `bx images "query"` | Up to 200 results with thumbnails |
-| Find videos | `bx videos "query"` | Results with duration, views, creator |
-| Find places / businesses | `bx places "coffee" --location "San Francisco"` | Local POI search |
-| Refine a search query | `bx suggest "query"` | Autocomplete suggestions |
-| Check spelling | `bx spellcheck "qurey"` | Corrects misspelled queries |
-| Boost/filter domains or paths | `bx "query" --goggles ...` | Custom re-ranking/allowlisting |
+| `bx "query"` (default: `context`) | `.grounding.generic[]` → `{url, title, snippets[]}` | Default for docs, errors, code — pre-extracted snippets, token-budgeted |
+| `bx "query" --include-site example.com` | same | Context extraction + domain allowlist |
+| `bx web "query" --count 5` | `.web.results[]` → `{url, title}` | Raw triage — scan titles/URLs, then pass URLs to Firecrawl |
+| `bx web "query" --result-filter discussions` | same | Forums/discussions often have solutions |
+| `bx web "site:docs.rs query" --operators` | same | Use search operators (`site:`, `intitle:`) |
+| `bx news "query" --freshness pd` | `.results[]` → `{title, url, age}` | Latest news / recent events |
+| `bx places "coffee" --location "San Francisco"` | `.results[]` → `{title, postal_address, contact}` | Local POI search |
 
-## Token Budget Control
+**Narrow broad results** — tighten with `--threshold strict` or use Goggles (below).
 
-| Flag | Default | What it does |
-|--|--|--|
-| `--count` | 20 | Results to consider before extracting (1-50) |
-| `--max-tokens` | 8192 | Total tokens to return (1024-32768) |
-| `--max-tokens-per-url` | 4096 | Max per URL (512-8192) |
-| `--max-urls` | 20 | Max URLs in response (1-50) |
-| `--max-snippets` | 50 | Max snippets across all URLs |
-| `--threshold` | balanced | Relevance: `strict`, `balanced`, `lenient` |
+**Tune output size** — `--max-urls 5` (URLs returned), `--max-tokens 4096` (total tokens). Full flags in cli-reference.md.
 
-## Parsing Output
+### Parsing `bx` Output
 
-All output is JSON. Use `jq` to read it:
+All output is JSON. Use `jq`:
 
 ```bash
 # Pretty-print snippets from context results
-bx "query" --max-urls 5 | jq -r '.grounding.generic[] | "\n\(.title)\n\(.url)\n" + (.snippets[:2][]? | "  - " + .)'
+bx "query" --max-urls 5 | jq -r '.grounding.generic[] | "\(.title)\n\(.url)\n" + (.snippets[:2][]? | "  - " + .)'
 
 # Triage raw web results
-bx web "query" --count 5 | jq -r '.web.results[] | "\n\(.title)\n\(.url)"'
+bx web "query" --count 5 | jq -r '.web.results[] | "\(.title)\n\(.url)"'
+
+# Extract URLs for piping to Firecrawl
+bx web "query" --count 5 | jq -r '.web.results[:3][] | .url'
 ```
 
-## Goggles — Boost or Block Domains
+### Goggles — Boost or Block Domains
 
-Quick shortcuts:
 ```bash
 # Only these domains
 bx "rust axum" --include-site docs.rs --include-site github.com
 
-# Exclude a domain
-bx "python tutorial" --exclude-site example.com
-```
-
-Inline rules (mutually exclusive with `--include-site`/`--exclude-site`):
-```bash
 # Boost official docs, demote blog posts
 bx "axum middleware tower" \
   --goggles '$boost=5,site=docs.rs
 $boost=3,site=github.com
 /docs/$boost=5
 /blog/$downrank=3' --max-tokens 4096
-
-# Allowlist mode — only matched sites
-bx "Python asyncio patterns" \
-  --goggles '$discard
-$boost,site=docs.python.org
-$boost,site=peps.python.org' --max-tokens 4096
 ```
 
-Quick DSL: `$boost=N,site=DOMAIN` (promote), `$downrank=N,site=DOMAIN` (demote), `$discard,site=DOMAIN` (remove), `/path/$boost=N` (path matching), `$discard` as last rule for allowlist mode. See [references](references/cli-reference.md) for wildcards, stdin piping, and file-based goggles.
+## Phase 2 — Read with Firecrawl
 
-## JSON Response Shapes
+Self-hosted at `http://localhost:3002` (v2.11). Renders pages in a real headless browser via Playwright — handles JavaScript, anti-bot challenges, dynamic content, SPAs, and paywalls. Self-hosted instances lack cloud-only "Fire-engine" (advanced proxy rotation).
 
-**`bx "query"`** (context — default):
-```json
-{
-  "grounding": { "generic": [{ "url": "...", "title": "...", "snippets": ["..."] }] },
-  "sources": { "https://...": { "title": "...", "hostname": "...", "age": [...] } }
-}
-```
+### Endpoint Overview
 
-**`bx web "query"`** (raw results):
-```json
-{
-  "web": { "results": [{ "title": "...", "url": "...", "description": "..." }] },
-  "news": { "results": [...] },
-  "videos": { "results": [...] },
-  "discussions": { "results": [...] }
-}
-```
-
-## Exit Codes
-
-| Code | Meaning | Action |
+| Endpoint | Method | What it does |
 |--|--|--|
-| 0 | Success | Process results |
-| 1 | Client error | Fix query/parameters |
-| 2 | Usage error | Fix CLI arguments |
-| 3 | Auth error (401/403) | Check API key |
-| 4 | Rate limited (429) | Retry after delay |
-| 5 | Server/network error | Retry with backoff |
+| `POST /v1/scrape` | sync | Scrape a single URL — returns immediately |
+| `POST /v1/search` | sync | Search the web + optionally scrape results in one call |
+| `POST /v1/map` | sync | Map a site — find all URLs without downloading content |
+| `POST /v1/crawl` | async | Crawl a site — download content from multiple pages |
+| `GET /v1/crawl/:id` | sync | Check crawl job status and results |
+| `POST /v1/batch/scrape` | async | Queue multiple URLs for scraping (like crawl but URL-list-driven) |
+| `GET /v1/batch/scrape/:id` | sync | Check batch scrape status and results |
 
-## Reading / Visiting Search Results
+Self-hosted search uses DuckDuckGo by default (SearXNG or Fire Engine if configured). No external API key needed.
 
-Pass a URL as the query to read it deeply:
+### 1. Scrape a Single URL
+
 ```bash
-bx "https://docs.python.org/3/library/..." \
-  --max-urls 1 --max-tokens 8192 --max-tokens-per-url 8192 \
-  --max-snippets 10 --threshold strict
+# Basic scrape — returns markdown (default format)
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com"}'
+
+# Request multiple formats
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com", "formats": ["markdown", "html", "links"]}'
 ```
 
-There is no `bx open`/`bx fetch`. Try URL-as-`context` before `curl`, but verify the returned `.grounding.generic[].url` matches the requested page. Fall back to `curl` for paywalls, login walls, heavy JS, unindexed, or mismatched pages.
+#### Output Formats
 
-Recommended search → read loop:
+| Format | What it returns |
+|--|--|
+| `markdown` *(default)* | Clean markdown text |
+| `html` | Cleaned HTML |
+| `rawHtml` | Raw, unmodified HTML |
+| `links` | Array of all links on the page |
+| `screenshot` | Viewport screenshot (base64 PNG) |
+| `screenshot@fullPage` | Full-page screenshot (base64 PNG) |
+| `extract` | LLM-powered structured data extraction (requires API key) |
+
+#### Content Control
+
 ```bash
-# 1. Search with extracted snippets
-bx "Python 3.14 t-strings official docs" --count 20 --max-urls 5 --max-tokens 4096
-# 2. Results weak? Increase recall, keep output small
-bx "Python 3.14 t-strings official docs" --count 50 --max-urls 5 --threshold lenient
-# 3. Need authoritative sources? Constrain by domain
-bx "Python 3.14 t-strings official docs" --include-site docs.python.org --max-urls 5
-# 4. Read a chosen URL by passing the URL to context
-bx "https://docs.python.org/3/library/..." --max-urls 1 --max-tokens-per-url 8192 --max-snippets-per-url 10
+# Keep only main content (default: true) — strips nav, footer, sidebar
+"onlyMainContent": true
+
+# Aggressive cleanup — remove ads, navbars, modals
+"onlyCleanContent": true
+
+# Include only specific HTML tags
+"includeTags": ["article", "main"]
+
+# Exclude specific HTML tags
+"excludeTags": ["script", "style", "noscript"]
+
+# Render mobile layout instead of desktop
+"mobile": true
+
+# Parse embedded PDFs
+"parsePDF": true
 ```
+
+#### Timing & Rendering
+
+```bash
+# Wait N ms after page load before capturing content (handles JS rendering)
+"waitFor": 3000
+
+# Total request timeout in ms (default: 30000, max waitFor = half of timeout)
+"timeout": 60000
+
+# Use fast mode — skips JS rendering for static pages (faster but may miss dynamic content)
+"fastMode": true
+```
+
+#### Proxy Options
+
+```bash
+# Proxy mode: "basic" (default), "stealth", "enhanced", "auto"
+"proxy": "stealth"
+
+# Block ad networks (default: true)
+"blockAds": true
+```
+
+#### Browser Actions (interact with the page before scraping)
+
+Perform up to 50 actions (total wait ≤ 60s including `waitFor`):
+
+```bash
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "url": "https://example.com",
+    "formats": ["markdown"],
+    "actions": [
+      {"type": "wait", "milliseconds": 2000},
+      {"type": "click", "selector": "button.load-more"},
+      {"type": "wait", "selector": ".new-content"},
+      {"type": "scroll", "direction": "down"},
+      {"type": "write", "text": "search query"},
+      {"type": "press", "key": "Enter"},
+      {"type": "executeJavascript", "script": "document.body.click()"},
+      {"type": "screenshot"},
+      {"type": "scrape"}
+    ]
+  }'
+```
+
+#### Location Spoofing (Geo-targeted content)
+
+```bash
+"location": {
+  "country": "US",
+  "languages": ["en-US", "en"]
+}
+```
+
+#### Parsing Scrape Output
+
+```bash
+# Extract just the markdown
+... | jq -r '.data.markdown'
+
+# Extract metadata (title, status code, URL, language)
+... | jq '.data.metadata | {title, statusCode, sourceURL, language}'
+
+# Extract links
+... | jq '.data.links'
+
+# Check success
+... | jq '.success'
+```
+
+#### LLM Extraction (requires `OPENAI_API_KEY` or `OLLAMA_BASE_URL` in `.env`)
+
+```bash
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "url": "https://example.com/product",
+    "formats": ["markdown"],
+    "jsonOptions": {
+      "mode": "llm",
+      "prompt": "Extract product details",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "product_name": {"type": "string"},
+          "price": {"type": "string"},
+          "in_stock": {"type": "boolean"}
+        }
+      }
+    }
+  }'
+```
+
+### 2. Search the Web (search → scrape in one call)
+
+Combines web search with Firecrawl scraping — returns results with full page content. Use when you want search + live content without the two-phase bx→Firecrawl workflow.
+
+```bash
+# Search only (returns title, URL, description — like Google results)
+curl -s -X POST http://localhost:3002/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "Rust async best practices", "limit": 5}' | jq -r '.data[] | "\(.title)\n\(.url)"'
+
+# Search + scrape (returns full page content for each result)
+curl -s -X POST http://localhost:3002/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "Rust async best practices",
+    "limit": 3,
+    "scrapeOptions": {"formats": ["markdown"]}
+  }' | jq -r '.data[] | "== \(.metadata.title) ==\n\(.markdown[:500])"'
+
+# Search with language/country targeting
+curl -s -X POST http://localhost:3002/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "cafe near me", "lang": "fr", "country": "FR"}'
+
+# Search + scrape with JS rendering
+# (useful when search result pages need JavaScript)
+curl -s -X POST http://localhost:3002/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "pricing comparison",
+    "limit": 2,
+    "scrapeOptions": {
+      "formats": ["markdown"],
+      "waitFor": 2000
+    }
+  }'
+```
+
+Search options: `query`, `limit` (default: 5, max: 100), `lang` (default: "en"), `country`, `location`, `tbs` (Google time filter, e.g. "qdr:d" for last day), `filter` (e.g. "u1" for past hour).
+
+**bx vs Firecrawl search** — both do generic web search. Prefer `bx` when result quality matters (Brave index > DuckDuckGo), you need freshness filtering, or you want to triage pre-extracted snippets before scraping. Prefer Firecrawl search when you want search + live content in one call and don't need bx-specific features (Goggles, news, images, places).
+
+### 3. Map a Site (find URLs without downloading content)
+
+Fast way to discover all URLs on a domain — uses sitemap + light crawling.
+
+```bash
+# Map all URLs on a domain
+curl -s -X POST http://localhost:3002/v1/map \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com"}'
+
+# Filter by search term
+curl -s -X POST http://localhost:3002/v1/map \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com", "search": "pricing", "limit": 50}'
+
+# Include subdomains
+curl -s -X POST http://localhost:3002/v1/map \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com", "includeSubdomains": true}'
+
+# Only use sitemap (no crawling)
+curl -s -X POST http://localhost:3002/v1/map \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com", "sitemapOnly": true}'
+```
+
+Map options: `includePaths`, `excludePaths`, `maxDepth`, `limit` (default: 5000, max: 5000), `ignoreSitemap`, `includeSubdomains`.
+
+### 4. Crawl a Site (download content from multiple pages)
+
+Async — submits a job, poll for results.
+
+```bash
+# Start a crawl
+curl -s -X POST http://localhost:3002/v1/crawl \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "url": "https://example.com/blog",
+    "limit": 20,
+    "scrapeOptions": {"formats": ["markdown"]}
+  }' | jq '.id'
+
+# Check status (returns completed results)
+curl -s http://localhost:3002/v1/crawl/JOB_ID | jq '{status: .status, total: (.data | length)}'
+
+# Get just the markdown from completed results
+curl -s http://localhost:3002/v1/crawl/JOB_ID | jq -r '.data[] | "\(.metadata.title)\n\(.markdown[:200])"'
+```
+
+Crawl options (`crawlerOptions`):
+
+| Option | Default | What it does |
+|--|--|--|
+| `includePaths` | `[]` | Only crawl URLs matching these regex patterns |
+| `excludePaths` | `[]` | Skip URLs matching these regex patterns |
+| `maxDepth` | 10 | Max URL path depth to crawl |
+| `limit` | 10000 | Max pages to crawl |
+| `allowExternalLinks` | false | Follow links to external domains |
+| `allowSubdomains` | false | Follow links to subdomains |
+| `ignoreRobotsTxt` | false | Respect robots.txt rules |
+| `ignoreSitemap` | false | Use sitemap for URL discovery |
+| `delay` | none | Seconds between requests (max 60) |
+| `deduplicateSimilarURLs` | true | Skip URLs that differ only in query params |
+
+### 5. Batch Scrape (queue multiple URLs)
+
+Like crawl, but you provide the URL list instead of discovery by link-following.
+
+```bash
+# Submit batch scrape
+curl -s -X POST http://localhost:3002/v1/batch/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "urls": ["https://example.com/1", "https://example.com/2"],
+    "formats": ["markdown"]
+  }' | jq '.id'
+
+# Check status
+curl -s http://localhost:3002/v1/batch/scrape/JOB_ID | jq '{status: .status, total: (.data | length)}'
+```
+
+Batch accepts all scrape options (`formats`, `waitFor`, `actions`, etc.) plus `urls` array.
+
+## Search → Scrape Patterns
+
+### Pattern 1: Search, then read top results
+
+```bash
+# 1. Search for URLs
+bx "Rust async best practices" --count 5 | jq -r '.web.results[:3][] | .url'
+
+# 2. Scrape each URL with Firecrawl
+for url in $(bx "Rust async best practices" --count 5 | jq -r '.web.results[:3][] | .url'); do
+  echo "=== $url ==="
+  curl -s -X POST http://localhost:3002/v1/scrape \
+    -H 'Content-Type: application/json' \
+    -d "{\"url\": \"$url\", \"formats\": [\"markdown\"]}" | jq -r '.data.markdown' | head -30
+done
+```
+
+### Pattern 2: Direct scrape (known site)
+
+Skip search entirely when you know the URL:
+
+```bash
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://www.example.com/product-page.html", "formats": ["markdown"]}'
+```
+
+### Pattern 3: Quick check if bx snippets are enough
+
+```bash
+# 1. Try bx context first (fast, no extra tool)
+bx "Rust async book channels" --max-urls 3 --max-tokens 2048
+# 2. If snippets are stale/empty/JS-heavy → Firecrawl
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "URL_FROM_BX"}'
+```
+
+### Pattern 4: Discover site structure, then scrape specific pages
+
+```bash
+# 1. Map the site to find relevant pages
+curl -s -X POST http://localhost:3002/v1/map \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://docs.example.com", "search": "authentication", "limit": 10}' | jq -r '.links[]'
+
+# 2. Scrape the most relevant page
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "URL_FROM_MAP", "formats": ["markdown"]}' | jq -r '.data.markdown'
+```
+
+## Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `bx` returns no results for a site | Site is JS-rendered, blocked, or unindexed. Use Firecrawl directly on the known URL, or map the parent domain. |
+| `bx` snippets are outdated | Use Firecrawl to scrape the URL live. |
+| `bx` results are too broad | Narrow with `--include-site`, search operators, `--threshold strict`, or Goggles boosts/blocks. |
+| `bx` returns 401/403 | Brave Search credentials are unavailable or invalid. Prefer Firecrawl search if discovery can be DuckDuckGo-backed; otherwise ask the user before changing credentials. |
+| Firecrawl returns 403 | Site has bot protection. Try `"proxy": "stealth"`, `"waitFor": 2000`, or a browser action. Self-hosted lacks advanced proxy rotation. |
+| Firecrawl returns 404 | URL is dead or the search index is stale. Map the parent domain to find valid links. |
+| Firecrawl returns empty markdown | Page requires login, has a paywall, or renders content dynamically. Check `statusCode`; try `"waitFor"`, scrolling/click actions, or `"formats": ["html"]`. |
+| Firecrawl scrape is slow | JS-heavy pages can take 3–10s. Use `"fastMode": true` for static pages when rendering is unnecessary. |
+| Content is missing after scrape | Add `"waitFor": 2000`, use browser `"actions"`, or request `"html"`/`"rawHtml"` to inspect the page. |
+| Too much noise in output | Use `"onlyMainContent": true`, `"onlyCleanContent": true`, `"includeTags"`, or `"excludeTags"`. |
+| Mobile-only content | Add `"mobile": true`. |
+| Links are needed | Use `"formats": ["links"]`; v2 does not use `includeLinks`. |
 
 ## Examples
 
-**User:** *"what are the breaking changes in Next.js 15?"*
+**User:** *"what's on https://example.com/pricing?"*
+```bash
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com/pricing", "formats": ["markdown"]}' | jq -r '.data.markdown'
+```
+
+**User:** *"find me the latest Next.js 15 breaking changes"*
 ```bash
 bx "Next.js 15 breaking changes migration guide" --max-urls 5 --max-tokens 4096
+# If snippets are stale, scrape the top result:
+curl -s -X POST http://localhost:3002/v1/scrape \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "URL_FROM_BX", "formats": ["markdown"]}'
 ```
 
-**User:** *"search for the official Rust async book chapter on channels"*
+**User:** *"what pages does docs.example.com have about authentication?"*
 ```bash
-bx "Rust async book channels" --include-site rust-lang.org --include-site docs.rs --max-urls 5
+curl -s -X POST http://localhost:3002/v1/map \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://docs.example.com", "search": "authentication"}' | jq -r '.links[]'
 ```
 
-**User:** *"check the latest news about the Python 3.14 release"*
+**User:** *"check the latest Python 3.14 release news"*
 ```bash
 bx news "Python 3.14 release" --freshness pd
 ```
